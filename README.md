@@ -35,5 +35,7 @@ The [**src**](https://github.com/chencen2000/epam/tree/develop) folder contains 
 ## Model architecture and pre-training process
 Our baseline model inherits the ideas from original [U-net](https://arxiv.org/abs/1505.04597) as proposed by Ronneberger et al. However, it has fewer stages and lower number of channels to meet speed requirements. It utilizes dilated convolitions (x2) at every stage to increase the receptive field of the model. Overall, the model has only a fraction of number of trainable parameters, compared to the original U-net model.
 
-Model architecture diagram
+![UNet-architecture-This-diagram-is-based-on-the-original-UNet-publication-20 (1)](https://github.com/user-attachments/assets/51a568e4-cad1-4820-8e97-e776a8a544cd)
+
+Baseline model architecture diagram
 
