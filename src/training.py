@@ -85,7 +85,7 @@ class Up(nn.Module):
         
         if bilinear:
             self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-            self.conv = DoubleConv(in_channels, out_channels, in_channels // 2)
+            self.conv = DoubleConv(in_channels, out_channels) #, in_channels // 2)
         else:
             self.up = nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2)
             self.conv = DoubleConv(in_channels, out_channels)
@@ -117,24 +117,23 @@ class UNet(nn.Module):
         self.bilinear = bilinear
 
         self.inc = DoubleConv(n_channels, 24)
-        self.down1 = Down(24, 48)
-        self.down2 = Down(48, 64)
-        factor = 2 if bilinear else 1
-        self.down3 = Down(64, 128 // factor)
-        self.up2 = Up(128, 96 // factor, bilinear)
-        self.up3 = Up(96, 48 // factor, bilinear)
-        self.up4 = Up(48, 32, bilinear)
+        self.down1 = Down(24, 32)
+        self.down2 = Down(32, 40)
+        self.down3 = Down(40, 48)
+        self.up1 = Up(88, 32, bilinear)
+        self.up2 = Up(64, 32, bilinear)
+        self.up3 = Up(56, 32, bilinear)
         self.outc = OutConv(32, n_classes)
 
-    def forward(self, x): # number of output channels
-        x1 = self.inc(x) # 24
-        x2 = self.down1(x1) # 48
-        x3 = self.down2(x2) # 64
-        x4 = self.down3(x3) # 64
-        x = self.up2(x4, x3) # 96
-        x = self.up3(x, x2) # 48
-        x = self.up4(x, x1) 
-        logits = self.outc(x)
+    def forward(self, x): # number of input/output channels
+        x1 = self.inc(x) # 1/24
+        x2 = self.down1(x1) # 24/32
+        x3 = self.down2(x2) # 32/40
+        x4 = self.down3(x3) # 40/48
+        x = self.up1(x4, x3) # 88/32
+        x = self.up2(x, x2) # 64/32
+        x = self.up3(x, x1) # 56/32
+        logits = self.outc(x) # 32/1
         return logits
 
 class MemoryEfficientSegmentationDataset(Dataset):
