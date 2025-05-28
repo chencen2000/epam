@@ -23,18 +23,18 @@ We are currently in the process of annotating additional dirt samples and some p
 ### Python modules description
 The [**src**](https://github.com/chencen2000/epam/tree/develop) folder contains the core Python scripts for a synthetic dirt image data generation pipeline. This includes modules for:
 
-- **Argument Parsing** ([arguments.py](https://github.com/chencen2000/epam/blob/develop/src/arguments.py)): Handles command-line argument definition and parsing for configuration.
-- **Data Generation Orchestration** ([data_generation.py](https://github.com/chencen2000/epam/blob/develop/src/data_generation.py)): The main script that orchestrates the data generation process, including loading images, applying dirt, and saving synthetic data and annotations.
-- **Configuration** ([data_generation_config.py](https://github.com/chencen2000/epam/blob/develop/src/data_generation_config.py)): Defines default parameters for the data generation process.
-- **Dirt Placement Logic** ([dirt_placement.py](https://github.com/chencen2000/epam/blob/develop/src/dirt_placement.py)): Implements the algorithms for placing dirt samples on images, including background estimation and mask creation with dual thresholds and distorted boundaries.
-- **Image Operations** ([image_operations.py](https://github.com/chencen2000/epam/blob/develop/src/image_operations.py)): Provides fundamental image processing utilities such as loading, saving, scaling, rotation, and bounding box calculations.
-- **Mask Generation** ([masks2.py](https://github.com/chencen2000/epam/blob/develop/src/masks2.py)): Focuses on creating and manipulating distorted polygon masks used for dirt placement.
-- **General Utilities** ([utils.py](https://github.com/chencen2000/epam/blob/develop/src/utils.py)): Contains helper functions for file handling (listing image files) and splitting images into patches with annotations.
-- **Visualization** ([visualization.py](https://github.com/chencen2000/epam/blob/develop/src/visualization.py)): Offers tools to visualize various stages of the image processing and mask creation.
+- **Argument Parsing** ([arguments.py](https://github.com/chencen2000/epam/blob/main/src/arguments.py)): Handles command-line argument definition and parsing for configuration.
+- **Data Generation Orchestration** ([data_generation.py](https://github.com/chencen2000/epam/blob/main/src/data_generation.py)): The main script that orchestrates the data generation process, including loading images, applying dirt, and saving synthetic data and annotations.
+- **Configuration** ([data_generation_config.py](https://github.com/chencen2000/epam/blob/main/src/data_generation_config.py)): Defines default parameters for the data generation process.
+- **Dirt Placement Logic** ([dirt_placement.py](https://github.com/chencen2000/epam/blob/main/src/dirt_placement.py)): Implements the algorithms for placing dirt samples on images, including background estimation and mask creation with dual thresholds and distorted boundaries.
+- **Image Operations** ([image_operations.py](https://github.com/chencen2000/epam/blob/main/src/image_operations.py)): Provides fundamental image processing utilities such as loading, saving, scaling, rotation, and bounding box calculations.
+- **Mask Generation** ([masks2.py](https://github.com/chencen2000/epam/blob/main/src/masks2.py)): Focuses on creating and manipulating distorted polygon masks used for dirt placement.
+- **General Utilities** ([utils.py](https://github.com/chencen2000/epam/blob/main/src/utils.py)): Contains helper functions for file handling (listing image files) and splitting images into patches with annotations.
+- **Visualization** ([visualization.py](https://github.com/chencen2000/epam/blob/main/src/visualization.py)): Offers tools to visualize various stages of the image processing and mask creation.
 
 ## Model architecture and pre-training process
 Our baseline model inherits the ideas from original [U-net](https://arxiv.org/abs/1505.04597) as proposed by Ronneberger et al. However, it has fewer stages and lower number of channels to meet speed requirements. It utilizes dilated convolitions (x2) at every stage to increase the receptive field of the model. Overall, the model has only a fraction of number of trainable parameters, compared to the original U-net model.
 
 ![UNet-architecture-This-diagram-is-based-on-the-original-UNet-publication-20 (1)](https://github.com/user-attachments/assets/51a568e4-cad1-4820-8e97-e776a8a544cd)
 
-Baseline model architecture diagram
+Baseline model architecture diagram. The architecture diagram is preliminary and approximate, serves as an illustration of the approach, the exact number of channels on some of the layers can be different in the training [code](https://github.com/chencen2000/epam/blob/main/src/training.py).
