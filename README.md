@@ -38,4 +38,3 @@ Our baseline model inherits the ideas from original [U-net](https://arxiv.org/ab
 ![UNet-architecture-This-diagram-is-based-on-the-original-UNet-publication-20 (1)](https://github.com/user-attachments/assets/51a568e4-cad1-4820-8e97-e776a8a544cd)
 
 Baseline model architecture diagram
-
