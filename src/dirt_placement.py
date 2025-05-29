@@ -132,11 +132,11 @@ def place_dirt_sample(target_img_float,
         rotation_angle = random.uniform(rotation_range[0], rotation_range[1])
 
         # Scale and rotate low threshold mask (for superimposing)
-        scaled_mask_low, scaled_width, scaled_height = apply_scale(dirt_mask_low, scale, interpolation=cv2.INTER_NEAREST)
+        scaled_mask_low, scaled_width, scaled_height = apply_scale(dirt_mask_low, scale, interpolation=cv2.INTER_CUBIC)
         if scaled_mask_low is None or scaled_width <= 0 or scaled_height <= 0: continue
-        _, scaled_mask_low = cv2.threshold(scaled_mask_low, 127, 255, cv2.THRESH_BINARY)
+        #_, scaled_mask_low = cv2.threshold(scaled_mask_low, 127, 255, cv2.THRESH_BINARY)
 
-        transformed_mask_low, transformed_width, transformed_height = apply_rotation(scaled_mask_low, rotation_angle, interpolation=cv2.INTER_NEAREST, border_value=0)
+        transformed_mask_low, transformed_width, transformed_height = apply_rotation(scaled_mask_low, rotation_angle, interpolation=cv2.INTER_CUBIC, border_value=0)
         if transformed_mask_low is None or transformed_width <= 0 or transformed_height <= 0: continue
         _, transformed_mask_low = cv2.threshold(transformed_mask_low, 127, 255, cv2.THRESH_BINARY)
 
@@ -149,17 +149,17 @@ def place_dirt_sample(target_img_float,
             )
 
         # Scale and rotate high threshold mask (for annotations)
-        scaled_mask_high, _, _ = apply_scale(dirt_mask_high, scale, interpolation=cv2.INTER_NEAREST)
+        scaled_mask_high, _, _ = apply_scale(dirt_mask_high, scale, interpolation=cv2.INTER_CUBIC)
         if scaled_mask_high is None: continue
-        _, scaled_mask_high = cv2.threshold(scaled_mask_high, 127, 255, cv2.THRESH_BINARY)
+        #_, scaled_mask_high = cv2.threshold(scaled_mask_high, 127, 255, cv2.THRESH_BINARY)
 
-        transformed_mask_high, _, _ = apply_rotation(scaled_mask_high, rotation_angle, interpolation=cv2.INTER_NEAREST, border_value=0)
+        transformed_mask_high, _, _ = apply_rotation(scaled_mask_high, rotation_angle, interpolation=cv2.INTER_CUBIC, border_value=0)
         if transformed_mask_high is None: continue
         _, transformed_mask_high = cv2.threshold(transformed_mask_high, 127, 255, cv2.THRESH_BINARY)
 
         # Resize high threshold mask to match low threshold mask dimensions
         if transformed_mask_high.shape != transformed_mask_low.shape:
-            transformed_mask_high = cv2.resize(transformed_mask_high, (transformed_mask_low.shape[1], transformed_mask_low.shape[0]), interpolation=cv2.INTER_NEAREST)
+            transformed_mask_high = cv2.resize(transformed_mask_high, (transformed_mask_low.shape[1], transformed_mask_low.shape[0]), interpolation=cv2.INTER_CUBIC)
             _, transformed_mask_high = cv2.threshold(transformed_mask_high, 127, 255, cv2.THRESH_BINARY)
 
         # Apply distorted boundary to high threshold mask if enabled
