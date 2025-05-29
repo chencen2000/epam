@@ -64,19 +64,19 @@ def create_dirt_mask_from_dirty_image(read_path, threshold_low, threshold_high, 
     _, dirt_mask_high = cv2.threshold(abs_estimated_dirt_difference_normalized, threshold_high, 255, cv2.THRESH_BINARY)
     
     # Apply morphological operations to make masks more realistic
-    kernel_small = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    kernel_medium = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    #kernel_small = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    #kernel_medium = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     
     # Clean up the masks
-    dirt_mask_low = cv2.morphologyEx(dirt_mask_low, cv2.MORPH_CLOSE, kernel_small)
-    dirt_mask_low = cv2.morphologyEx(dirt_mask_low, cv2.MORPH_OPEN, kernel_small)
+    #dirt_mask_low = cv2.morphologyEx(dirt_mask_low, cv2.MORPH_CLOSE, kernel_small)
+    #dirt_mask_low = cv2.morphologyEx(dirt_mask_low, cv2.MORPH_OPEN, kernel_small)
     
-    dirt_mask_high = cv2.morphologyEx(dirt_mask_high, cv2.MORPH_CLOSE, kernel_medium)
-    dirt_mask_high = cv2.morphologyEx(dirt_mask_high, cv2.MORPH_OPEN, kernel_small)
+    #dirt_mask_high = cv2.morphologyEx(dirt_mask_high, cv2.MORPH_CLOSE, kernel_medium)
+    #dirt_mask_high = cv2.morphologyEx(dirt_mask_high, cv2.MORPH_OPEN, kernel_small)
     
     # Remove small noise components
-    dirt_mask_low = remove_small_components(dirt_mask_low, min_area=50)
-    dirt_mask_high = remove_small_components(dirt_mask_high, min_area=100)
+    #dirt_mask_low = remove_small_components(dirt_mask_low, min_area=50)
+    #dirt_mask_high = remove_small_components(dirt_mask_high, min_area=100)
 
     if visualize and original_color is not None:
         visualize_dual_threshold_results(original_color, estimated_clean_background, 
