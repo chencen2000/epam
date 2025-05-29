@@ -43,11 +43,11 @@ def create_dirt_mask_from_dirty_image(read_path, threshold_low, threshold_high, 
     estimated_clean_background = np.full(dirty_img_gray.shape, background_luminance, dtype=np.uint8)
     
     # Additional morphological operations for better background estimation
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-    estimated_clean_background = cv2.morphologyEx(estimated_clean_background, cv2.MORPH_CLOSE, kernel)
+    #kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    #estimated_clean_background = cv2.morphologyEx(estimated_clean_background, cv2.MORPH_CLOSE, kernel)
     
     # Apply Gaussian blur for smoother background
-    estimated_clean_background = cv2.GaussianBlur(estimated_clean_background, (5, 5), 0)
+    #estimated_clean_background = cv2.GaussianBlur(estimated_clean_background, (5, 5), 0)
     
     dirty_img_float = dirty_img_gray.astype(np.float32)
     estimated_clean_background_float = estimated_clean_background.astype(np.float32)
