@@ -9,17 +9,18 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config.training import TrainingConfig
 from src.training.trainer import train_model
+from src.synthesis.image_operations import ImageOperations
 from src.core.logger_config import setup_application_logger
 
 
 def argument_parser():
     parser = argparse.ArgumentParser(description='Train U-Net for image segmentation')
-    parser.add_argument('--root_dir', type=str, default='../../data/train_1', 
+    parser.add_argument('--root_dir', type=str, default='data/new_train_100', 
                        help='Root directory containing training data')
-    parser.add_argument('--save_dir', type=str, default='../../models/test_del', 
+    parser.add_argument('--save_dir', type=str, default='models/new_train_100_mini_unet', 
                        help='Directory to save models and results')
     parser.add_argument('--num_epochs', type=int, default=1, help='Number of training epochs')
-    parser.add_argument('--batch_size', type=int, default=1, help='Batch size')
+    parser.add_argument('--batch_size', type=int, default=4, help='Batch size')
     parser.add_argument('--learning_rate', type=float, default=1e-4, help='Learning rate')
     parser.add_argument('--target_size', type=int, nargs=2, default=[1024, 1024], 
                        help='Target image size (height width)')
@@ -28,20 +29,16 @@ def argument_parser():
     parser.add_argument('--no_amp', action='store_true', help='Disable automatic mixed precision')
     parser.add_argument('--checkpoint_freq', type=int, default=5, help='Checkpoint frequency (epochs)')
     parser.add_argument('--no_memory_tracking', action='store_true', help='Disable memory leak detection')
+    parser.add_argument('--arch_config', type=str, default="config/models/mini_unet.yaml")
     
     args = parser.parse_args()
     
     return args
 
 
-def main():
+def main(args):
 
-    app_logger = setup_application_logger(
-        app_name="trainer", 
-        log_file_name="logs/trainer.log"
-    )
-
-    args = argument_parser()
+    
 
     # Create configuration
     config = TrainingConfig(
@@ -56,9 +53,10 @@ def main():
         checkpoint_frequency=args.checkpoint_freq,
         memory_tracking=not args.no_memory_tracking
     )
+    image_operations = ImageOperations(app_logger)
     
     try:
-        model, history = train_model(config, app_logger)
+        model, history = train_model(config, image_operations, app_logger, args.arch_config)
         print("Training completed successfully!")
         
     except Exception as e:
@@ -70,4 +68,11 @@ if __name__ == "__main__":
     os.environ["DEBUG"] = "false"
     os.environ["NO_ALBUMENTATIONS_UPDATE"] = "1"
 
-    main()
+    app_logger = setup_application_logger(
+        app_name="trainer", 
+        log_file_name="logs/trainer.log"
+    )
+
+    args = argument_parser()
+
+    main(args=args)

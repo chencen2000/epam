@@ -18,7 +18,7 @@ from sklearn.model_selection import train_test_split
 from config.training import TrainingConfig
 from src.models.unet import UNet
 from src.utils.memory_utils import MemoryTracker
-from src.training.metrics import MetricsCalculator
+from src.training.metrics import calculate_dice, calculate_iou
 from src.training.losses import CombinedLoss
 from src.core.device_utils import get_device_info
 from src.data.segmentation_dataset import SegmentationDataset
@@ -68,8 +68,8 @@ def train_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Module,
                 loss = criterion(outputs, masks) / accumulation_steps
             
             # Calculate metrics
-            batch_iou = MetricsCalculator.calculate_iou(outputs, masks)
-            batch_dice = MetricsCalculator.calculate_dice(outputs, masks)
+            batch_iou = calculate_iou(outputs, masks)
+            batch_dice = calculate_dice(outputs, masks)
             
             metrics['iou'] += batch_iou
             metrics['dice'] += batch_dice
@@ -174,8 +174,8 @@ def validate_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Modul
                     loss = criterion(outputs, masks)
                 
                 # Calculate metrics
-                batch_iou = MetricsCalculator.calculate_iou(outputs, masks)
-                batch_dice = MetricsCalculator.calculate_dice(outputs, masks)
+                batch_iou = calculate_iou(outputs, masks)
+                batch_dice = calculate_dice(outputs, masks)
                 
                 metrics['iou'] += batch_iou
                 metrics['dice'] += batch_dice
@@ -221,7 +221,7 @@ def validate_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Modul
     
     return avg_loss, metrics
 
-def train_model(config: TrainingConfig, logger:logging.Logger) -> Tuple[nn.Module, Dict]:
+def train_model(config: TrainingConfig, logger:logging.Logger, arch_config:str) -> Tuple[nn.Module, Dict]:
     """Enhanced main training function with comprehensive logging and checkpointing"""
     
     # Setup
@@ -320,7 +320,9 @@ def train_model(config: TrainingConfig, logger:logging.Logger) -> Tuple[nn.Modul
         n_channels=3, 
         n_classes=config.num_classes, 
         bilinear=True,
-        architecture=config.model_architecture
+        architecture=config.model_architecture,
+        app_logger=logger,
+        config_path=arch_config,
     ).to(device)
     
     # Log model information

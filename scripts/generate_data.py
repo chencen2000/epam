@@ -41,7 +41,7 @@ def main():
         num_version_per_image=4,
         num_dirt_super_impose=100,
         clean_image_downscale_factor=2,
-        scale_dirt=(0.5, 2),
+        scale_dirt=(0.75, 1.5),
         rotation_range=(0, 360),
         app_logger=logger
     )

@@ -73,9 +73,9 @@ class SegmentationDataset(Dataset):
             
             # Resize efficiently
             if image.shape[:2] != self.target_size:
-                image = cv2.resize(image, self.target_size, interpolation=cv2.INTER_LINEAR)
+                image = cv2.resize(image, self.target_size, interpolation=cv2.INTER_CUBIC)
             if mask.shape != self.target_size:
-                mask = cv2.resize(mask, self.target_size, interpolation=cv2.INTER_NEAREST)
+                mask = cv2.resize(mask, self.target_size, interpolation=cv2.INTER_CUBIC)
             
             # Convert to proper types
             image = image.astype(np.float32)

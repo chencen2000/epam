@@ -215,3 +215,29 @@ class PatchGenerator:
         roi = local_mask[intersect_local_y1:intersect_local_y2, 
                         intersect_local_x1:intersect_local_x2]
         return cv2.countNonZero(roi)
+
+
+    def _create_prediction_patch_from_screen(self, screen_image: np.ndarray, 
+                                  patch_size: int, overlap: float) -> List[Tuple]:
+        """Create patches from the detected screen area"""
+        # Create dummy mask and annotations for patch generator
+        dummy_mask = np.ones((screen_image.shape[0], screen_image.shape[1]), dtype=np.uint8) * 255
+        dummy_annotations = []  # No annotations needed for inference
+        
+        # Calculate boundaries (use entire screen)
+        screen_h, screen_w = screen_image.shape[:2]
+        
+        patches_data = self.split_image_into_patches(
+            image=screen_image,
+            mask=dummy_mask,
+            annotations=dummy_annotations,
+            patch_size=patch_size,
+            full_img_boundary_x_min=0,
+            full_img_boundary_y_min=0, 
+            full_img_boundary_x_max=screen_w,
+            full_img_boundary_y_max=screen_h,
+            overlap=overlap,
+            return_empty_patches=True  # We want all patches for inference
+        )
+        
+        return patches_data

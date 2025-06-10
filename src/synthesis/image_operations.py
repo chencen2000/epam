@@ -1,28 +1,51 @@
 import os
 import random
 import logging
-from typing import Optional
+from typing import Optional, Tuple
+from pathlib import Path
 
 import cv2
 import numpy as np
+from torch import Tensor
 
+from src.data.transformations import get_transforms
 from src.core.logger_config import setup_application_logger
 
 
 class ImageOperations:
+
+    _SUPPORTED_FORMAT = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif']
+
     def __init__(self, app_logger:Optional[logging.Logger]=None):
         if app_logger is None:
             app_logger = setup_application_logger()
         self.logger = app_logger.getChild('ImageOperations')
 
+    def _check_img_path_exists(self, path:str):
+        img_path = Path(path)
+        if not img_path.exists():
+            raise FileNotFoundError(f"Image file not found: {img_path}")
+        
+        if img_path.suffix.lower() not in self._SUPPORTED_FORMAT:
+            raise ValueError(f"Unsupported image format: {img_path.suffix}. "
+                           f"Supported formats: {self._SUPPORTED_FORMAT}")
+        
+        return True
+        
+
     def load_image(self, image_path:str):
+        # Validate the path first
+        self._check_img_path_exists(image_path)
+
         img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
         if img is None:
             raise ValueError(f"Could not load image from {image_path}")
         return img
 
     def load_image_color(self, image_path):
-        if not os.path.exists(image_path): return None
+        # Validate the path first
+        self._check_img_path_exists(image_path)
+        
         return cv2.imread(image_path, cv2.IMREAD_COLOR)
   
     def save_image(self, image, path):
@@ -172,3 +195,15 @@ class ImageOperations:
         
         return distorted_mask
 
+    def preprocess_prediction_image(self,  image: np.ndarray, device:str="auto", target_size: Tuple[int, int] = (1024, 1024), config={}) -> Tensor:
+        """Preprocess single image for inference"""
+        # if target_size is None:
+        #     target_size = self.config.get('target_size', (1024, 1024))
+            
+        transform = get_transforms(target_size, config)
+        
+        # Apply transforms
+        transformed = transform(image=image)
+        image_tensor = transformed['image'].unsqueeze(0)  # Add batch dimension
+        
+        return image_tensor.to(device)
