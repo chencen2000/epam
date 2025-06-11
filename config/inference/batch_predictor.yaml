@@ -1,0 +1,26 @@
+# batch config files aims to run prediction on new images (patch which don't have masks) in batch mode
+
+model:
+  path: "models/best_model/best_model.pth"
+  device: "auto"
+  threshold: 0.5
+
+input:
+  path: "tests/images/"
+  image_extensions: [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]
+  max_samples: null
+
+output:
+  dir: "tests/inference_results/batch_predictions"
+
+processing:
+  batch_mode: True
+  new_images: True
+  full_phone:
+    enabled: False
+    patch_size: 1024
+    overlap: 0
+    min_dirt_threshold: 0.01
+
+logging:
+  file: "logs/batch_predictor.log"
