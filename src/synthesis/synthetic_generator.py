@@ -262,7 +262,7 @@ class SyntheticDataGenerator:
         
         for i, image_name in enumerate(self.clean_imgs):
             # if i < 1: continue
-            if i > 2: break
+            # if i > 2: break
             # if "354183139993956_177_0_0_122529443" not in image_name: continue
 
             self.logger.debug(f"{image_name = }")
