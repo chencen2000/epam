@@ -7,12 +7,12 @@ model:
   threshold: 0.5
 
 input:
-  path: "tests/images/"
+  path: "tests/scratch_images_star/"
   image_extensions: [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]
   max_samples: null
 
 output:
-  dir: "tests/inference_results/full_phone_batch_predictions"
+  dir: "tests/inference_results/scratch_star"
 
 processing:
   batch_mode: True
@@ -24,4 +24,4 @@ processing:
     min_dirt_threshold: 0.01
 
 logging:
-  file: "logs/full_phone_single_predictor.log"
+  file: "logs/full_phone_batch_predictor_star.log"

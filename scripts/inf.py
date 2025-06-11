@@ -42,7 +42,7 @@ def main():
     """Enhanced main function with config-based inference"""
     parser = argparse.ArgumentParser(description='Enhanced Dirt Detection Model Inference with Config Support')
     parser.add_argument('--config', type=str, 
-                       default='config/predictor.yaml',
+                       default='config/default_predictor.yaml',
                        help='Path to the configuration YAML file')
     
     args = parser.parse_args()
@@ -118,7 +118,8 @@ def main():
             region_analyzer=region_analyzer, 
             image_operations=image_operations, 
             model_path=model_path, 
-            app_logger=app_logger
+            app_logger=app_logger,
+            confidence_threshold=threshold,
         )
 
         full_ph_predictor = FullScreenPredictor(
@@ -160,7 +161,9 @@ def main():
                 overlap=overlap,
                 output_dir=str(output_path),
                 image_extensions=image_extensions,
-                max_images=max_samples
+                max_images=max_samples,
+                threshold = threshold,
+                min_dirt_threshold = min_dirt_threshold,
             )
             app_logger.info(f"Batch full phone inference completed. Results saved to: {output_path}")
         except Exception as e:
@@ -180,12 +183,7 @@ def main():
                 output_dir = str(output_path),
                 show_plot = True,
                 min_dirt_threshold = min_dirt_threshold,
-                # str(input_path_obj),
-                # patch_size=patch_size,
-                # overlap=overlap,
-                # save_results=True,
-                # output_dir=str(output_path),
-                # show_plot=True
+                threshold = threshold,
             )
             app_logger.info("Full phone inference completed!")
         except Exception as e:

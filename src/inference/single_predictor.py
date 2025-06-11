@@ -37,6 +37,7 @@ class SingleImagePredictor(BasePredictor):
 
         image_tensor = self.image_operations.preprocess_prediction_image(image,self.device, target_size, self.config)
         
+        
         with no_grad():
             start_time = time.time()
             logits = self.model(image_tensor)
@@ -47,7 +48,7 @@ class SingleImagePredictor(BasePredictor):
             
             # Resize back to original size - TODO: use image operations
             import cv2
-            probabilities = cv2.resize(probabilities, (original_size[1], original_size[0]))
+            probabilities = cv2.resize(probabilities, (original_size[1], original_size[0]), interpolation=cv2.INTER_CUBIC)
             binary_pred = cv2.resize(binary_pred, (original_size[1], original_size[0]), interpolation=cv2.INTER_CUBIC)
         
         result = {
