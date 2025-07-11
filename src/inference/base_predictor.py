@@ -42,7 +42,7 @@ class BasePredictor(ABC):
         }
         
         # Class names for multi-class
-        self.class_names = ['background', 'dirt', 'scratches']
+        self.class_names = ['background',  'scratches', 'dirt',]
         
         self.load_model(model_path)
 

@@ -56,6 +56,8 @@ class SingleImagePredictor(BasePredictor):
             start_time = time.time()
             logits = self.model(image_tensor)
             inference_time = time.time() - start_time
+
+            self.logger.info(f"Model inference time = {inference_time}")
             
             # FIXED: Use softmax for multi-class instead of sigmoid
             probabilities = softmax(logits, dim=1).cpu().numpy()[0]  # Shape: (num_classes, H, W)
@@ -64,7 +66,6 @@ class SingleImagePredictor(BasePredictor):
             class_prediction = np.argmax(probabilities, axis=0).astype(np.uint8)  # Shape: (H, W)
             
             # Resize back to original size
-            import cv2
             class_prediction = cv2.resize(class_prediction, (original_size[1], original_size[0]), 
                                         interpolation=cv2.INTER_NEAREST)
             
@@ -118,7 +119,7 @@ class SingleImagePredictor(BasePredictor):
 
     def single_prediction_pipeline(self,
                                     image_path: str, save_results: bool = True, 
-                                    output_dir: str = None, show_plot: bool = True, **kwargs) -> Dict:
+                                    output_dir: str = None, show_plot: bool = False, **kwargs) -> Dict:
         """
         Complete pipeline for predicting on a new image without ground truth
         UPDATED FOR MULTI-CLASS
@@ -302,7 +303,7 @@ class SingleImagePredictor(BasePredictor):
             # Multi-class prediction visualization
             class_pred_colored = self.create_multiclass_visualization(prediction_result['class_prediction'])
             axes[1, 0].imshow(class_pred_colored)
-            axes[1, 0].set_title('Multi-Class Prediction\n(Black=BG, Green=Dirt, Red=Scratches)', 
+            axes[1, 0].set_title('Multi-Class Prediction\n(Black=BG, Green=Scratches, Red=Dirt)', 
                                fontsize=12, fontweight='bold')
             axes[1, 0].axis('off')
             
@@ -328,7 +329,7 @@ class SingleImagePredictor(BasePredictor):
             # Prediction overlay on original image
             overlay = self.create_multiclass_overlay(image, prediction_result['class_prediction'])
             axes[2, 0].imshow(overlay)
-            axes[2, 0].set_title('Multi-Class Overlay\n(Green=Dirt, Red=Scratches)', 
+            axes[2, 0].set_title('Multi-Class Overlay\n(Green=Scratches, Red=Dirt)', 
                                fontsize=12, fontweight='bold')
             axes[2, 0].axis('off')
             
@@ -575,7 +576,7 @@ Class Distribution:"""
             # Multi-class prediction
             class_pred_colored = self.create_multiclass_visualization(prediction_result['class_prediction'])
             axes[0, 1].imshow(class_pred_colored)
-            axes[0, 1].set_title('Multi-Class Prediction\n(Black=BG, Green=Dirt, Red=Scratches)', 
+            axes[0, 1].set_title('Multi-Class Prediction\n(Black=BG, Green=Scratches, Red=Dirt)', 
                                fontsize=12, fontweight='bold')
             axes[0, 1].axis('off')
             

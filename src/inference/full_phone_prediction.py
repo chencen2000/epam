@@ -727,7 +727,7 @@ class FullScreenPredictor:
             results['aggregated_prediction']['class_prediction']
         )
         ax3.imshow(class_pred_colored)
-        ax3.set_title('Multi-Class Prediction\n(Black=BG, Green=Dirt, Red=Scratches)', 
+        ax3.set_title('Multi-Class Prediction\n(Black=BG, Green=Scratches, Red=Dirt)', 
                      fontsize=12, fontweight='bold')
         ax3.axis('off')
         
@@ -754,7 +754,7 @@ class FullScreenPredictor:
         # Dirt probability map
         ax6 = fig.add_subplot(gs[1, 0])
         dirt_display = ax6.imshow(dirt_prob, cmap='Greens', vmin=0, vmax=1)
-        ax6.set_title(f'Dirt Probability\n({results["aggregated_prediction"]["class_statistics"]["dirt_percentage"]:.1f}%)', 
+        ax6.set_title(f'Scratches Probability\n({results["aggregated_prediction"]["class_statistics"]["dirt_percentage"]:.1f}%)', 
                      fontsize=12, fontweight='bold')
         ax6.axis('off')
         plt.colorbar(dirt_display, ax=ax6, fraction=0.046, pad=0.04)
@@ -762,7 +762,7 @@ class FullScreenPredictor:
         # Scratches probability map
         ax7 = fig.add_subplot(gs[1, 1])
         scratch_display = ax7.imshow(scratch_prob, cmap='Reds', vmin=0, vmax=1)
-        ax7.set_title(f'Scratches Probability\n({results["aggregated_prediction"]["class_statistics"]["scratches_percentage"]:.1f}%)', 
+        ax7.set_title(f'Dirt Probability\n({results["aggregated_prediction"]["class_statistics"]["scratches_percentage"]:.1f}%)', 
                      fontsize=12, fontweight='bold')
         ax7.axis('off')
         plt.colorbar(scratch_display, ax=ax7, fraction=0.046, pad=0.04)
@@ -770,13 +770,13 @@ class FullScreenPredictor:
         # Dirt binary mask
         ax8 = fig.add_subplot(gs[1, 2])
         ax8.imshow(results['aggregated_prediction']['binary_masks']['dirt'], cmap='Greens', vmin=0, vmax=1)
-        ax8.set_title('Dirt Binary Mask', fontsize=12, fontweight='bold')
+        ax8.set_title('Scratches Binary Mask', fontsize=12, fontweight='bold')
         ax8.axis('off')
         
         # Scratches binary mask
         ax9 = fig.add_subplot(gs[1, 3])
         ax9.imshow(results['aggregated_prediction']['binary_masks']['scratches'], cmap='Reds', vmin=0, vmax=1)
-        ax9.set_title('Scratches Binary Mask', fontsize=12, fontweight='bold')
+        ax9.set_title('Dirt Binary Mask', fontsize=12, fontweight='bold')
         ax9.axis('off')
         
         # Patch coverage visualization
