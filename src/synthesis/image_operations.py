@@ -1,10 +1,11 @@
 import os
 import random
 import logging
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 from pathlib import Path
 
 import cv2
+import torch
 import numpy as np
 from torch import Tensor
 
@@ -207,3 +208,50 @@ class ImageOperations:
         image_tensor = transformed['image'].unsqueeze(0)  # Add batch dimension
         
         return image_tensor.to(device)
+    
+
+    def preprocess_prediction_image(self, image: np.ndarray, device: str, 
+                               target_size: Tuple[int, int] = (1024, 1024),
+                               config: Dict = None) -> torch.Tensor:
+        """
+        Preprocess image for prediction - FIXED FOR GRAYSCALE MODEL
+        
+        Args:
+            image: Input image (RGB or grayscale)
+            device: Target device
+            target_size: Target size for resizing
+            config: Model configuration
+            
+        Returns:
+            Preprocessed tensor ready for model input
+        """
+        # Convert to grayscale if RGB
+        if len(image.shape) == 3 and image.shape[2] == 3:
+            # Convert RGB to grayscale
+            gray_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+            self.logger.debug(f"Converted RGB image {image.shape} to grayscale {gray_image.shape}")
+        elif len(image.shape) == 3 and image.shape[2] == 1:
+            # Already single channel, squeeze
+            gray_image = image.squeeze(-1)
+        elif len(image.shape) == 2:
+            # Already grayscale
+            gray_image = image
+        else:
+            raise ValueError(f"Unexpected image shape: {image.shape}")
+        
+        # Resize if needed
+        if gray_image.shape[:2] != target_size:
+            gray_image = cv2.resize(gray_image, target_size, interpolation=cv2.INTER_CUBIC)
+            self.logger.debug(f"Resized image to {target_size}")
+        
+        # Normalize to [0, 1]
+        if gray_image.dtype == np.uint8:
+            gray_image = gray_image.astype(np.float32) / 255.0
+        
+        # Convert to tensor and add batch + channel dimensions
+        # Shape: (H, W) -> (1, 1, H, W)
+        tensor = torch.from_numpy(gray_image).unsqueeze(0).unsqueeze(0).to(device)
+        
+        self.logger.debug(f"Final tensor shape: {tensor.shape}")
+        
+        return tensor

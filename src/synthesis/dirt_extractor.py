@@ -30,18 +30,18 @@ class DirtExtractor:
         pixel_rank = int(size * size * rank)
         return rank_filter(image, rank=pixel_rank, size=(size, size))
     
-    def estimate_background(self, dirt_img, bg_estimation_filter_size=51, rank=0.65):
-        estimated_clean_background = cv2.medianBlur(dirt_img, bg_estimation_filter_size)
-        # estimated_clean_background = self.apply_rank_filter(dirt_img, rank, bg_estimation_filter_size)
+    def estimate_background(self, dirt_img, bg_estimation_filter_size=51):
+        kernel2 = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+        dirt_eroded = cv2.morphologyEx(dirt_img, cv2.MORPH_DILATE, kernel2)
+        estimated_clean_background = cv2.medianBlur(dirt_eroded, bg_estimation_filter_size)
 
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
         estimated_clean_background = cv2.morphologyEx(estimated_clean_background, cv2.MORPH_CLOSE, kernel)
         estimated_clean_background = cv2.GaussianBlur(estimated_clean_background, (5, 5), 0)
 
-        
         return estimated_clean_background
     
-    def create_dirt_masks(Self, dirt_img, clean_bg):
+    def create_dirt_masks(self, dirt_img, clean_bg):
 
         img_float = dirt_img.astype(np.float32)
         clean_bg_float = clean_bg.astype(np.float32)
@@ -49,18 +49,17 @@ class DirtExtractor:
         # For mask creation, use absolute difference
         abs_diff = cv2.absdiff(img_float, clean_bg_float)
         norm_diff = cv2.normalize(abs_diff, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8U)
-        # norm_diff = cv2.convertScaleAbs(abs_diff, alpha=255, beta=0)
-        # norm_diff = (abs_diff * 255).astype(np.uint8)
 
+        # Filter noise in norm_diff
+        filtered_diff = cv2.bilateralFilter(norm_diff, 25, 30, 11)
         
         # Multiple thresholding strategies
         # 1. Otsu's method for automatic threshold
-        threshold, high_thresh_mask = cv2.threshold(norm_diff, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        _, low_thresh_mask = cv2.threshold(norm_diff, threshold-10, 255, cv2.THRESH_BINARY) # -10 is optional, one can adjust this value in 0..20 interval
+        threshold, high_thresh_mask = cv2.threshold(filtered_diff, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        _, low_thresh_mask = cv2.threshold(filtered_diff, threshold-10, 255, cv2.THRESH_BINARY) # -10 is optional, one can adjust this value in 0..20 interval
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
         low_thresh_mask = cv2.morphologyEx(low_thresh_mask, cv2.MORPH_DILATE, kernel) # optional, just another option to make this mask more "thick"
 
-        # norm_diff = norm_diff / 255
         return low_thresh_mask, high_thresh_mask, abs_diff
     
     def create_dirt_masks_deprecated(Self, dirt_img, clean_bg):
