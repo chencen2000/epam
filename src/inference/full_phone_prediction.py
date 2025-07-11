@@ -222,6 +222,19 @@ class FullScreenPredictor:
         
         # Save results
         if save_results:
+            suction_cup_path = output_dir / f"{image_path.stem}_suction_cup.png"
+            new_image = self.single_image_predictor.image_operations.load_image(str(image_path))
+            new_img_resized = self.single_image_predictor.image_operations.resize_image(new_image, 25)
+            self.single_image_predictor.predict_and_save_suction_cup(
+                suction_cup_path, 
+                new_img_resized
+            )
+
+            if "_0_0_" in image_path.stem:
+                self.single_image_predictor.check_power_on_device_algo(
+                        output_dir, new_image, image_path.stem
+                )
+            
             # Save comprehensive visualization
             vis_path = output_dir / f"{image_path.stem}_full_phone_multiclass_analysis.png"
             self.visualize_full_phone_prediction(
@@ -260,6 +273,8 @@ class FullScreenPredictor:
                 class_name = self.single_image_predictor.class_names[cls]
                 self.logger.info(f"- {class_name} mask saved")
             self.logger.info(f"- Full overlay: {full_overlay_path.name}")
+
+            
         
         # Print comprehensive summary
         self.print_full_phone_summary(results)
@@ -438,6 +453,8 @@ class FullScreenPredictor:
                 })
                 
                 patch_results.append(patch_result)
+
+                
                 
             except Exception as e:
                 self.logger.warning(f"Error processing patch {i}: {e}")

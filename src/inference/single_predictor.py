@@ -210,6 +210,14 @@ class SingleImagePredictor(BasePredictor):
                 for cls in range(self.num_classes):
                     class_name = self.class_names[cls]
                     self.logger.debug(f"- {class_name} mask and probability maps saved")
+
+                suction_cup_path = output_dir / f"{image_path.stem}_suction_cup.png"
+                self.predict_and_save_suction_cup(suction_cup_path, image)
+
+                if "_0_0_" in image_path.stem:
+                    self.check_power_on_device_algo(
+                        output_dir, image, image_path.stem
+                    )
                     
             except Exception as e:
                 self.logger.error(f"Failed to save results: {e}")
@@ -513,6 +521,42 @@ Class Distribution:"""
             json.dump(summary, f, indent=2, default=str)
         
         self.logger.debug(f"Multi-class batch summary saved to: {save_path}")
+
+    def predict_and_save_suction_cup(self, save_path, image):
+        # image = cv2.imread(f'{path}/{image_name}', cv2.IMREAD_GRAYSCALE)
+        self.logger.info("inside predict_and_save_suction_cup")
+        if image is None:
+            return
+        (h, w) = image.shape[:2]
+        # scale_factor = 25 # 25 times smaller to fit 640 height
+        # small_image = cv2.resize(image, (int(w/scale_factor), int(h/scale_factor)), interpolation = cv2.INTER_AREA)
+        rgb_small_image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        
+        # Perform object detection on an image using the model
+        results = self.suction_cup_model(
+            rgb_small_image,
+            show=False,
+            save=False, #True,
+            save_txt=False, #True,
+            save_conf=False, #True,
+            save_crop=False, #True,
+            show_conf=False, #True,
+            show_labels=False, #True,
+            # line_width=1,
+            conf=0.636,
+            rect=True, # allow padding to rectangular input images
+            imgsz=[640, 320], # indicating exact image dimensions reduces inference time significantly!!!
+            max_det=15 # max number of detections per image
+            )
+        
+        # Process results
+        for result in results:
+            boxes = result.boxes  # Boxes object for bounding box outputs
+            for item in boxes.data:
+                x0, y0, x1, y1, conf, _ = item
+                cv2.rectangle(rgb_small_image, (int(x0), int(y0)), (int(x1), int(y1)), color=(255, 0, 0), thickness=1)
+        self.logger.info(f"Saving suction cup result at {save_path = }")
+        cv2.imwrite(save_path, rgb_small_image)
 
     # Legacy methods for backward compatibility
     def create_comparison_mask(self, prediction: np.ndarray, ground_truth: np.ndarray) -> np.ndarray:

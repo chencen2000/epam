@@ -2,17 +2,17 @@
 # -> detect mobile boundary -> create patch and predict -> aggregate patch
 
 model:
-  path: "models/best_model/best_model.pth"
+  path: "models/light_weight_new_synthetic_data/best_model.pth"
   device: "auto"
-  threshold: 0.5
+  threshold: 0.50
 
 input:
-  path: "tests/scratch_images_star/"
+  path: "tests/testset//"
   image_extensions: [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]
   max_samples: null
 
 output:
-  dir: "tests/inference_results/scratch_star"
+  dir: "tests/inference/"
 
 processing:
   batch_mode: True
@@ -24,4 +24,4 @@ processing:
     min_dirt_threshold: 0.01
 
 logging:
-  file: "logs/full_phone_batch_predictor_star.log"
+  file: "logs/full_phone_batch_predictor.log"
