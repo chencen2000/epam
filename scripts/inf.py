@@ -7,10 +7,10 @@ import argparse
 # Add project root to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import cv2
+import numpy as np
 
 from src.core.config_parser import ConfigParser
-from src.inference.predictor import ModelInference
+# from src.inference.predictor import ModelInference
 from src.core.logger_config import setup_application_logger
 
 
@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import cv2
 
 from src.core.config_parser import ConfigParser
-from src.inference.predictor import ModelInference
+# from src.inference.predictor import ModelInference
 from src.core.region_analyzer import RegionAnalyzer
 from src.synthesis.patch_generator import PatchGenerator
 from src.synthesis.image_operations import ImageOperations
@@ -38,11 +38,33 @@ from src.inference.single_predictor import SingleImagePredictor
 from src.inference.full_phone_prediction import FullScreenPredictor
 
 
+def validate_multiclass_setup(single_predictor, app_logger):
+    """Validate that the model is properly configured for multi-class"""
+    try:
+        # Check model configuration
+        num_classes = single_predictor.num_classes
+        class_names = single_predictor.class_names
+        
+        if num_classes != len(class_names):
+            app_logger.warning(f"Mismatch between num_classes ({num_classes}) and class_names ({len(class_names)})")
+        
+        if num_classes < 3:
+            app_logger.warning(f"Model appears to be binary (num_classes={num_classes}), but multi-class inference is expected")
+        
+        app_logger.info(f"Multi-class validation passed: {num_classes} classes - {class_names}")
+        return True
+        
+    except Exception as e:
+        app_logger.error(f"Multi-class validation failed: {e}")
+        return False
+    
+
+
 def main():
     """Enhanced main function with config-based inference"""
     parser = argparse.ArgumentParser(description='Enhanced Dirt Detection Model Inference with Config Support')
     parser.add_argument('--config', type=str, 
-                       default='config/default_predictor.yaml',
+                       default='config/inference/full_phone_batch_predictor.yaml',
                        help='Path to the configuration YAML file')
     
     args = parser.parse_args()
@@ -60,7 +82,7 @@ def main():
         sys.exit(1)
     
     # Setup logger
-    log_file = config.get('logging', {}).get('file', 'logs/inference.log')
+    log_file = config.get('logging', {}).get('file', 'logs/inference1.log')
     app_logger = setup_application_logger(
         app_name="predictor", 
         log_file_name=log_file
@@ -107,13 +129,14 @@ def main():
         app_logger.error("Error: Input path not specified in configuration")
         sys.exit(1)
     
-    # Initialize inference
+    # Initialize inference components
     try:
         image_operations = ImageOperations(app_logger)
         patch_generator = PatchGenerator(app_logger)
         boundary_detector = BoundaryDetector(image_operations, app_logger)
         region_analyzer = RegionAnalyzer(app_logger)
 
+        # UPDATED: Initialize single predictor with explicit multi-class support
         single_predictor = SingleImagePredictor(
             region_analyzer=region_analyzer, 
             image_operations=image_operations, 
@@ -121,20 +144,24 @@ def main():
             app_logger=app_logger,
             confidence_threshold=threshold,
         )
+        
+        # Log model information for verification
+        app_logger.info(f"Loaded multi-class model with {single_predictor.num_classes} classes: {single_predictor.class_names}")
 
+        # UPDATED: Initialize full screen predictor 
         full_ph_predictor = FullScreenPredictor(
             patch_generator=patch_generator, 
             boundary_detector=boundary_detector,
-            region_analyzer=region_analyzer, 
-            image_operations=image_operations,
-            single_image_predictor=single_predictor,
-            model_path=model_path, 
+            single_image_predictor=single_predictor,  # Pass the single predictor
             app_logger=app_logger,
         )
 
-        app_logger.info(f"Model loaded successfully from: {model_path}")
+        app_logger.info(f"Multi-class model loaded successfully from: {model_path}")
+        app_logger.info(f"Model architecture: {single_predictor.config.get('model_architecture', 'standard')}")
+        app_logger.info(f"Device: {single_predictor.device}")
+        
     except Exception as e:
-        app_logger.error(f"Error loading model: {e}")
+        app_logger.error(f"Error loading multi-class model: {e}")
         sys.exit(1)
     
     # Create output directory
@@ -152,42 +179,73 @@ def main():
     if full_phone_enabled and batch_mode:
 
         # Batch processing of full phone images
-        app_logger.info("Running batch inference on full phone images...")
+        app_logger.info("Running batch multi-class inference on full phone images...")
         try:
+            # Validate setup
+            if not validate_multiclass_setup(single_predictor, app_logger):
+                app_logger.warning("Multi-class setup validation failed, but continuing...")
+            
             results = batch_prediction(
-                prediction_service = full_ph_predictor,
+                prediction_service=full_ph_predictor,
                 image_dir=str(input_path),
-                patch_size=patch_size,
-                overlap=overlap,
                 output_dir=str(output_path),
                 image_extensions=image_extensions,
                 max_images=max_samples,
-                threshold = threshold,
-                min_dirt_threshold = min_dirt_threshold,
+                logger=app_logger,
+                # Pass multi-class specific parameters
+                patch_size=patch_size,
+                overlap=overlap,
+                min_dirt_threshold=min_dirt_threshold,
             )
-            app_logger.info(f"Batch full phone inference completed. Results saved to: {output_path}")
+            
+            # Log multi-class batch results summary
+            if results:
+                total_images = len(results)
+                avg_dirt = np.mean([r['overall_statistics']['screen_analysis']['class_statistics'].get('dirt_percentage', 0) for r in results])
+                avg_scratches = np.mean([r['overall_statistics']['screen_analysis']['class_statistics'].get('scratches_percentage', 0) for r in results])
+                
+                app_logger.info(f"Multi-class batch inference completed!")
+                app_logger.info(f"Processed {total_images} images")
+                app_logger.info(f"Average dirt coverage: {avg_dirt:.2f}%")
+                app_logger.info(f"Average scratch coverage: {avg_scratches:.2f}%")
+                app_logger.info(f"Results saved to: {output_path}")
+            
         except Exception as e:
-            app_logger.error(f"Error during batch full phone inference: {e}")
+            app_logger.error(f"Error during multi-class batch full phone inference: {e}")
             sys.exit(1)
 
     elif full_phone_enabled and not batch_mode:
 
-        # Single full phone image
-        app_logger.info(f"Running full phone inference on single image on: {input_path}")
+         # Single full phone image
+        app_logger.info(f"Running multi-class full phone inference on: {input_path}")
         try:
+            # Validate setup
+            if not validate_multiclass_setup(single_predictor, app_logger):
+                app_logger.warning("Multi-class setup validation failed, but continuing...")
+            
             result = full_ph_predictor.single_prediction_pipeline(
-                image_path = str(input_path),
-                patch_size = patch_size,
-                overlap = overlap,
-                save_results = True,
-                output_dir = str(output_path),
-                show_plot = True,
-                min_dirt_threshold = min_dirt_threshold,
-                threshold = threshold,
+                image_path=str(input_path),
+                patch_size=patch_size,
+                overlap=overlap,
+                save_results=True,
+                output_dir=str(output_path),
+                show_plot=True,
+                min_dirt_threshold=min_dirt_threshold,
             )
-            app_logger.info("Full phone inference completed!")
+            
+            # Log multi-class results
+            if result:
+                class_stats = result['overall_statistics']['screen_analysis']['class_statistics']
+                app_logger.info("Multi-class full phone inference completed!")
+                
+                for cls in range(single_predictor.num_classes):
+                    class_name = single_predictor.class_names[cls]
+                    percentage_key = f'{class_name}_percentage'
+                    if percentage_key in class_stats:
+                        app_logger.info(f"{class_name.title()} coverage: {class_stats[percentage_key]:.2f}%")
+            
         except Exception as e:
-            app_logger.error(f"Error during full phone inference: {e}")
+            app_logger.error(f"Error during multi-class full phone inference: {e}")
             sys.exit(1)
     
     elif new_images and batch_mode:
@@ -211,25 +269,49 @@ def main():
 
     elif new_images and not batch_mode:
         # Single full phone image
-        app_logger.info(f"Running full phone inference on single image on: {input_path}")
+        # Single new image inference
+        app_logger.info(f"Running multi-class inference on single image: {input_path}")
         try:
+            # Validate setup
+            if not validate_multiclass_setup(single_predictor, app_logger):
+                app_logger.warning("Multi-class setup validation failed, but continuing...")
+            
             result = single_predictor.single_prediction_pipeline(
-                image_path = str(input_path),
-                patch_size = patch_size,
-                overlap = overlap,
-                save_results = True,
-                output_dir = str(output_path),
-                show_plot = True,
-                min_dirt_threshold = min_dirt_threshold,
+                image_path=str(input_path),
+                save_results=True,
+                output_dir=str(output_path),
+                show_plot=True,
             )
-            app_logger.info("Full phone inference completed!")
+            
+            # Log multi-class results
+            if result and 'class_statistics' in result['prediction']:
+                class_stats = result['prediction']['class_statistics']
+                app_logger.info("Multi-class inference completed!")
+                
+                for cls in range(single_predictor.num_classes):
+                    class_name = single_predictor.class_names[cls]
+                    percentage_key = f'{class_name}_percentage'
+                    if percentage_key in class_stats:
+                        app_logger.info(f"{class_name.title()} coverage: {class_stats[percentage_key]:.2f}%")
+            
         except Exception as e:
-            app_logger.error(f"Error during full phone inference: {e}")
+            app_logger.error(f"Error during multi-class inference: {e}")
             sys.exit(1)
 
     elif not new_images and not batch_mode:
         # run with mask
-        single_predictor.predict_and_compare_mask(input_path, output_path)
+        # Run with ground truth comparison
+        app_logger.info("Running multi-class inference with ground truth comparison...")
+        try:
+            # Validate setup
+            if not validate_multiclass_setup(single_predictor, app_logger):
+                app_logger.warning("Multi-class setup validation failed, but continuing...")
+            
+            single_predictor.predict_and_compare_mask(input_path, output_path)
+            
+        except Exception as e:
+            app_logger.error(f"Error during multi-class ground truth comparison: {e}")
+            sys.exit(1)
 
     elif not new_images and batch_mode:
         # run with mask in batch mode
@@ -237,7 +319,7 @@ def main():
 
 
 if __name__ == "__main__":
-    os.environ["DEBUG"] = "true"
+    os.environ["DEBUG"] = "false"
     main()
 
 

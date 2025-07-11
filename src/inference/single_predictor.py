@@ -6,14 +6,14 @@ from typing import Union, Dict, List
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-from torch import no_grad, sigmoid
+from torch import no_grad, softmax
 import matplotlib.patches as mpatches
 
 from src.models.unet import UNet
 from src.core.region_analyzer import RegionAnalyzer
 from src.inference.base_predictor import BasePredictor
 from src.synthesis.image_operations import ImageOperations
-from src.training.metrics import calculate_metrics, _find_objects
+from src.training.metrics import calculate_multiclass_iou, calculate_multiclass_dice, calculate_metrics, _find_objects
 from src.core.logger_config import setup_application_logger
 from src.utils.file_utils import load_ground_truth_data
 
@@ -24,45 +24,95 @@ class SingleImagePredictor(BasePredictor):
         super().__init__(app_logger=app_logger, *args, **kwargs)
         self.region_analyzer = region_analyzer
         self.image_operations = image_operations
+        self.num_classes = self.config.get('num_classes', 3)
 
         if app_logger is None:
             app_logger = setup_application_logger()
         self.logger = app_logger.getChild('SingleImagePredictor')
 
-    
-    def predict(self, image: np.ndarray, target_size=(1024, 1024), return_raw: bool = False) -> Dict:
-        """Predict on a single image."""
-        original_size = image.shape[:2]
-        # target_size = self.config.get('target_size', (1024, 1024))
 
-        image_tensor = self.image_operations.preprocess_prediction_image(image,self.device, target_size, self.config)
+    def predict(self, image: np.ndarray, target_size=(1024, 1024), return_raw: bool = False) -> Dict:
+        """Predict on a single image - FIXED FOR GRAYSCALE MODEL."""
+        original_size = image.shape[:2]
         
+        # QUICK FIX: Convert to grayscale before preprocessing
+        if len(image.shape) == 3 and image.shape[2] == 3:
+            # Convert RGB to grayscale
+            gray_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+            self.logger.debug(f"Converted RGB patch {image.shape} to grayscale {gray_image.shape}")
+        elif len(image.shape) == 3 and image.shape[2] == 1:
+            # Already single channel, squeeze
+            gray_image = image.squeeze(-1)
+        elif len(image.shape) == 2:
+            # Already grayscale
+            gray_image = image
+        else:
+            raise ValueError(f"Unexpected image shape: {image.shape}")
+        
+        # Preprocess the grayscale image
+        image_tensor = self.image_operations.preprocess_prediction_image(gray_image, self.device, target_size, self.config)
         
         with no_grad():
             start_time = time.time()
             logits = self.model(image_tensor)
             inference_time = time.time() - start_time
             
-            probabilities = sigmoid(logits).cpu().numpy()[0, 0]
-            binary_pred = (probabilities > self.confidence_threshold).astype(np.uint8)
+            # FIXED: Use softmax for multi-class instead of sigmoid
+            probabilities = softmax(logits, dim=1).cpu().numpy()[0]  # Shape: (num_classes, H, W)
             
-            # Resize back to original size - TODO: use image operations
+            # Get class predictions (argmax across class dimension)
+            class_prediction = np.argmax(probabilities, axis=0).astype(np.uint8)  # Shape: (H, W)
+            
+            # Resize back to original size
             import cv2
-            probabilities = cv2.resize(probabilities, (original_size[1], original_size[0]), interpolation=cv2.INTER_CUBIC)
-            binary_pred = cv2.resize(binary_pred, (original_size[1], original_size[0]), interpolation=cv2.INTER_CUBIC)
+            class_prediction = cv2.resize(class_prediction, (original_size[1], original_size[0]), 
+                                        interpolation=cv2.INTER_NEAREST)
+            
+            # Resize probability maps for each class
+            class_probabilities = {}
+            for cls in range(self.num_classes):
+                prob_map = cv2.resize(probabilities[cls], (original_size[1], original_size[0]), 
+                                    interpolation=cv2.INTER_CUBIC)
+                class_probabilities[f'class_{cls}'] = prob_map
+                class_probabilities[self.class_names[cls]] = prob_map
+            
+            # Create binary masks for each class
+            binary_masks = {}
+            for cls in range(self.num_classes):
+                binary_masks[f'class_{cls}'] = (class_prediction == cls).astype(np.uint8)
+                binary_masks[self.class_names[cls]] = binary_masks[f'class_{cls}']
+            
+            # Calculate per-class statistics
+            class_stats = {}
+            total_pixels = class_prediction.size
+            
+            for cls in range(self.num_classes):
+                class_pixels = np.sum(class_prediction == cls)
+                class_percentage = (class_pixels / total_pixels) * 100
+                class_stats[f'class_{cls}_pixels'] = int(class_pixels)
+                class_stats[f'class_{cls}_percentage'] = float(class_percentage)
+                class_stats[f'{self.class_names[cls]}_pixels'] = int(class_pixels)
+                class_stats[f'{self.class_names[cls]}_percentage'] = float(class_percentage)
         
         result = {
-            'binary_prediction': binary_pred,
-            'probabilities': probabilities,
+            'class_prediction': class_prediction,  # Multi-class prediction map
+            'class_probabilities': class_probabilities,  # Probability maps for each class
+            'binary_masks': binary_masks,  # Binary mask for each class
+            'class_statistics': class_stats,  # Per-class pixel counts and percentages
             'confidence_threshold': self.confidence_threshold,
             'inference_time': inference_time,
             'original_size': original_size,
-            'dirt_pixels': np.sum(binary_pred),
-            'dirt_percentage': (np.sum(binary_pred) / binary_pred.size) * 100
+            'num_classes': self.num_classes,
+            
+            # Legacy compatibility - dirt as primary defect class
+            'binary_prediction': binary_masks['dirt'],  # For backward compatibility
+            'probabilities': class_probabilities['dirt'],  # For backward compatibility  
+            'dirt_pixels': class_stats['dirt_pixels'],
+            'dirt_percentage': class_stats['dirt_percentage']
         }
         
         if return_raw:
-            result['raw_logits'] = logits.cpu().numpy()[0, 0]
+            result['raw_logits'] = logits.cpu().numpy()[0]
             
         return result
 
@@ -71,26 +121,28 @@ class SingleImagePredictor(BasePredictor):
                                     output_dir: str = None, show_plot: bool = True, **kwargs) -> Dict:
         """
         Complete pipeline for predicting on a new image without ground truth
-        
-        Args:
-            image_path: Path to the new image
-            save_results: Whether to save visualization and results
-            output_dir: Directory to save results (default: same as image directory)
-            show_plot: Whether to display the plot
-            **kwargs: Additional keyword arguments (for protocol compatibility)
-            
-        Returns:
-            Complete prediction results
+        UPDATED FOR MULTI-CLASS
         """
-        self.logger.debug(f"Running single prediction pipeline ....")
+        self.logger.debug(f"Running multi-class single prediction pipeline ....")
         image_path = Path(image_path)
 
         image = self.image_operations.load_image_color(image_path)
 
         prediction_result = self.predict(image, return_raw=True)
 
-        # Analyze regions
-        region_analysis = self.region_analyzer.analyze_dirt_regions(prediction_result['binary_prediction'])
+        # Analyze regions for each defect class (excluding background)
+        region_analysis = {}
+        for cls in range(1, self.num_classes):  # Skip background (class 0)
+            class_name = self.class_names[cls]
+            binary_mask = prediction_result['binary_masks'][class_name]
+            region_analysis[class_name] = self.region_analyzer.analyze_dirt_regions(binary_mask)
+
+        # Overall defect analysis (combining all defect classes)
+        combined_defects = np.logical_or(
+            prediction_result['binary_masks']['dirt'],
+            prediction_result['binary_masks']['scratches']
+        ).astype(np.uint8)
+        region_analysis['combined_defects'] = self.region_analyzer.analyze_dirt_regions(combined_defects)
 
         # Prepare output directory
         if output_dir is None:
@@ -111,7 +163,9 @@ class SingleImagePredictor(BasePredictor):
             'model_info': {
                 'architecture': self.config.get('model_architecture', 'standard'),
                 'confidence_threshold': self.confidence_threshold,
-                'device': str(self.device)
+                'device': str(self.device),
+                'num_classes': self.num_classes,
+                'class_names': self.class_names
             }
         }
 
@@ -119,8 +173,8 @@ class SingleImagePredictor(BasePredictor):
         if save_results:
             try:
                 # Save visualization
-                vis_path = output_dir / f"{image_path.stem}_dirt_detection.png"
-                self.visualize_single_image_prediction(
+                vis_path = output_dir / f"{image_path.stem}_multiclass_detection.png"
+                self.visualize_multiclass_prediction(
                     image, prediction_result, region_analysis,
                     image_name=image_path.name,
                     save_path=str(vis_path), 
@@ -131,157 +185,211 @@ class SingleImagePredictor(BasePredictor):
                 results_path = output_dir / f"{image_path.stem}_results.json"
                 self.save_prediction_results(results, str(results_path))
                 
-                # Save binary mask
-                mask_path = output_dir / f"{image_path.stem}_dirt_mask.png"
-                cv2.imwrite(str(mask_path), prediction_result['binary_prediction'] * 255)
+                # Save class prediction map
+                class_pred_path = output_dir / f"{image_path.stem}_class_prediction.png"
+                cv2.imwrite(str(class_pred_path), prediction_result['class_prediction'])
                 
-                # Save probability map
-                prob_path = output_dir / f"{image_path.stem}_probability_map.png"
-                prob_vis = (prediction_result['probabilities'] * 255).astype(np.uint8)
-                cv2.imwrite(str(prob_path), prob_vis)
+                # Save individual class masks
+                for cls in range(self.num_classes):
+                    class_name = self.class_names[cls]
+                    mask_path = output_dir / f"{image_path.stem}_{class_name}_mask.png"
+                    cv2.imwrite(str(mask_path), prediction_result['binary_masks'][class_name] * 255)
+                
+                # Save probability maps for each class
+                for cls in range(self.num_classes):
+                    class_name = self.class_names[cls]
+                    prob_path = output_dir / f"{image_path.stem}_{class_name}_probability.png"
+                    prob_vis = (prediction_result['class_probabilities'][class_name] * 255).astype(np.uint8)
+                    cv2.imwrite(str(prob_path), prob_vis)
                 
                 self.logger.debug(f"\nResults saved to: {output_dir}")
                 self.logger.debug(f"- Visualization: {vis_path.name}")
                 self.logger.debug(f"- Results JSON: {results_path.name}")
-                self.logger.debug(f"- Binary mask: {mask_path.name}")
-                self.logger.debug(f"- Probability map: {prob_path.name}")
+                self.logger.debug(f"- Class prediction: {class_pred_path.name}")
+                for cls in range(self.num_classes):
+                    class_name = self.class_names[cls]
+                    self.logger.debug(f"- {class_name} mask and probability maps saved")
+                    
             except Exception as e:
                 self.logger.error(f"Failed to save results: {e}")
         
         # Print summary
-        self.print_prediction_summary(results)
+        self.print_multiclass_summary(results)
 
-        self.logger.debug(f"single_prediction_pipeline complete! ")
+        self.logger.debug(f"Multi-class single_prediction_pipeline complete! ")
         
         return results
     
-    def print_prediction_summary(self, results: Dict) -> None:
-        """Print a summary of prediction results"""
+    def print_multiclass_summary(self, results: Dict) -> None:
+        """Print a summary of multi-class prediction results"""
         pred = results['prediction']
         region = results['region_analysis']
         image_info = results['image_info']
         
-        self.logger.debug(f"\n" + "="*60)
-        self.logger.debug(f"DIRT DETECTION SUMMARY")
-        self.logger.debug(f"="*60)
+        self.logger.debug(f"\n" + "="*70)
+        self.logger.debug(f"MULTI-CLASS DIRT DETECTION SUMMARY")
+        self.logger.debug(f"="*70)
         self.logger.debug(f"Image: {image_info['filename']}")
         self.logger.debug(f"Size: {image_info['original_size'][1]} × {image_info['original_size'][0]} pixels")
+        self.logger.debug(f"Model Classes: {results['model_info']['num_classes']} ({', '.join(self.class_names)})")
         self.logger.debug(f"")
-        self.logger.debug(f"DETECTION RESULTS:")
-        self.logger.debug(f"  Dirt Percentage: {pred['dirt_percentage']:.2f}%")
-        self.logger.debug(f"  Dirt Pixels: {pred['dirt_pixels']:,} / {image_info['total_pixels']:,}")
-        self.logger.debug(f"  Confidence Threshold: {pred['confidence_threshold']}")
+        
+        self.logger.debug(f"CLASS-WISE DETECTION RESULTS:")
+        for cls in range(self.num_classes):
+            class_name = self.class_names[cls]
+            pixels = pred['class_statistics'][f'{class_name}_pixels']
+            percentage = pred['class_statistics'][f'{class_name}_percentage']
+            self.logger.debug(f"  {class_name.title()}: {percentage:.2f}% ({pixels:,} pixels)")
+        
         self.logger.debug(f"")
-        self.logger.debug(f"REGION ANALYSIS:")
-        if region['num_regions'] > 0:
-            self.logger.debug(f"  Number of Dirt Regions: {region['num_regions']}")
-            self.logger.debug(f"  Largest Region: {region['largest_region_area']:,} pixels")
-            self.logger.debug(f"  Smallest Region: {region['smallest_region_area']:,} pixels")
-            self.logger.debug(f"  Average Region Size: {region['average_region_area']:.1f} pixels")
-        else:
-            self.logger.debug(f"  No dirt regions detected")
+        self.logger.debug(f"DEFECT REGION ANALYSIS:")
+        
+        for class_name in ['dirt', 'scratches']:
+            if class_name in region:
+                class_regions = region[class_name]
+                if class_regions['num_regions'] > 0:
+                    self.logger.debug(f"  {class_name.title()} Regions:")
+                    self.logger.debug(f"    Number: {class_regions['num_regions']}")
+                    self.logger.debug(f"    Largest: {class_regions['largest_region_area']:,} pixels")
+                    self.logger.debug(f"    Average: {class_regions['average_region_area']:.1f} pixels")
+                else:
+                    self.logger.debug(f"  {class_name.title()}: No regions detected")
+        
+        # Combined defects summary
+        if 'combined_defects' in region and region['combined_defects']['num_regions'] > 0:
+            combined = region['combined_defects']
+            total_defect_percentage = pred['class_statistics']['dirt_percentage'] + pred['class_statistics']['scratches_percentage']
+            self.logger.debug(f"  Total Defects: {total_defect_percentage:.2f}% coverage")
+            self.logger.debug(f"  Combined Regions: {combined['num_regions']}")
+        
         self.logger.debug(f"")
         self.logger.debug(f"PERFORMANCE:")
         self.logger.debug(f"  Inference Time: {pred['inference_time']:.3f} seconds")
         self.logger.debug(f"  Device: {results['model_info']['device']}")
-        self.logger.debug(f"="*60)
+        self.logger.debug(f"="*70)
 
-    def visualize_single_image_prediction(self, image: np.ndarray, prediction_result: Dict,
+    def visualize_multiclass_prediction(self, image: np.ndarray, prediction_result: Dict,
                                      region_analysis: Dict = None, image_name: str = "Unknown",
                                      save_path: str = None, show_plot: bool = True) -> plt.Figure:
         """
-        Create visualization for new image prediction (without ground truth)
-        
-        Args:
-            image: Original input image
-            prediction_result: Result from predict_single()
-            region_analysis: Result from analyze_dirt_regions()
-            image_name: Name of the image file
-            save_path: Path to save the plot
-            show_plot: Whether to display the plot
-            
-        Returns:
-            Figure object if created successfully, None otherwise
+        Create visualization for multi-class prediction results
         """
         try:
-
-            fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+            fig, axes = plt.subplots(3, 4, figsize=(20, 15))
             
-            # Original image
+            # Row 1: Original and class probability maps
             axes[0, 0].imshow(image)
-            axes[0, 0].set_title('Original Image', fontsize=14, fontweight='bold')
+            axes[0, 0].set_title('Original Image', fontsize=12, fontweight='bold')
             axes[0, 0].axis('off')
             
-            # Prediction probability heatmap
-            prob_display = axes[0, 1].imshow(prediction_result['probabilities'], 
-                                        cmap='hot', vmin=0, vmax=1)
-            axes[0, 1].set_title(f'Prediction Probabilities\n(Threshold: {self.confidence_threshold})', 
-                            fontsize=14, fontweight='bold')
-            axes[0, 1].axis('off')
-            plt.colorbar(prob_display, ax=axes[0, 1], fraction=0.046, pad=0.04)
+            # Individual class probability maps
+            for cls in range(min(3, self.num_classes)):  # Show first 3 classes
+                class_name = self.class_names[cls]
+                prob_map = prediction_result['class_probabilities'][class_name]
+                
+                if cls == 0:  # Background
+                    im = axes[0, 1].imshow(prob_map, cmap='gray', vmin=0, vmax=1)
+                elif cls == 1:  # Dirt
+                    im = axes[0, 2].imshow(prob_map, cmap='Greens', vmin=0, vmax=1)
+                else:  # Scratches
+                    im = axes[0, 3].imshow(prob_map, cmap='Reds', vmin=0, vmax=1)
+                
+                axes[0, cls+1].set_title(f'{class_name.title()} Probability', fontsize=12, fontweight='bold')
+                axes[0, cls+1].axis('off')
+                plt.colorbar(im, ax=axes[0, cls+1], fraction=0.046, pad=0.04)
             
-            # Binary prediction
-            binary_display = axes[0, 2].imshow(prediction_result['binary_prediction'], 
-                                            cmap='Reds', vmin=0, vmax=1)
-            axes[0, 2].set_title(f'Binary Prediction\n({prediction_result["dirt_percentage"]:.1f}% dirt)', 
-                            fontsize=14, fontweight='bold')
-            axes[0, 2].axis('off')
-            
-            # Prediction overlay on original image
-            overlay1 = image.copy()
-            dirt_mask = prediction_result['binary_prediction'] == 1
-            overlay1[dirt_mask] = overlay1[dirt_mask] * 0.3 + np.array(self.colors['dirt']) * 0.7
-            axes[1, 0].imshow(overlay1.astype(np.uint8))
-            axes[1, 0].set_title('Prediction Overlay\n(Red = Predicted Dirt)', fontsize=14, fontweight='bold')
+            # Row 2: Class predictions and combined visualization
+            # Multi-class prediction visualization
+            class_pred_colored = self.create_multiclass_visualization(prediction_result['class_prediction'])
+            axes[1, 0].imshow(class_pred_colored)
+            axes[1, 0].set_title('Multi-Class Prediction\n(Black=BG, Green=Dirt, Red=Scratches)', 
+                               fontsize=12, fontweight='bold')
             axes[1, 0].axis('off')
             
-            # Probability overlay
-            overlay2 = image.copy().astype(np.float32)
-            prob_colored = plt.cm.hot(prediction_result['probabilities'])[:, :, :3] * 255
-            alpha = prediction_result['probabilities'][:, :, np.newaxis]
-            overlay2 = overlay2 * (1 - alpha * 0.7) + prob_colored * alpha * 0.7
-            axes[1, 1].imshow(overlay2.astype(np.uint8))
-            axes[1, 1].set_title('Probability Overlay\n(Hot colormap)', fontsize=14, fontweight='bold')
-            axes[1, 1].axis('off')
+            # Individual class binary masks
+            for cls in range(min(3, self.num_classes)):
+                class_name = self.class_names[cls]
+                binary_mask = prediction_result['binary_masks'][class_name]
+                
+                if cls == 0:  # Background - show inverted
+                    axes[1, cls+1].imshow(1 - binary_mask, cmap='gray', vmin=0, vmax=1)
+                elif cls == 1:  # Dirt
+                    axes[1, cls+1].imshow(binary_mask, cmap='Greens', vmin=0, vmax=1)
+                else:  # Scratches
+                    axes[1, cls+1].imshow(binary_mask, cmap='Reds', vmin=0, vmax=1)
+                
+                class_pixels = prediction_result['class_statistics'][f'{class_name}_pixels']
+                class_pct = prediction_result['class_statistics'][f'{class_name}_percentage']
+                axes[1, cls+1].set_title(f'{class_name.title()} Mask\n({class_pct:.1f}%, {class_pixels:,} px)', 
+                                       fontsize=12, fontweight='bold')
+                axes[1, cls+1].axis('off')
+            
+            # Row 3: Overlays and information
+            # Prediction overlay on original image
+            overlay = self.create_multiclass_overlay(image, prediction_result['class_prediction'])
+            axes[2, 0].imshow(overlay)
+            axes[2, 0].set_title('Multi-Class Overlay\n(Green=Dirt, Red=Scratches)', 
+                               fontsize=12, fontweight='bold')
+            axes[2, 0].axis('off')
+            
+            # Individual class overlays
+            for cls in range(1, min(3, self.num_classes)):  # Skip background
+                class_name = self.class_names[cls]
+                class_overlay = image.copy()
+                class_mask = prediction_result['binary_masks'][class_name] == 1
+                
+                if cls == 1:  # Dirt - green overlay
+                    class_overlay[class_mask] = class_overlay[class_mask] * 0.3 + np.array([0, 255, 0]) * 0.7
+                else:  # Scratches - red overlay
+                    class_overlay[class_mask] = class_overlay[class_mask] * 0.3 + np.array([255, 0, 0]) * 0.7
+                
+                axes[2, cls].imshow(class_overlay.astype(np.uint8))
+                axes[2, cls].set_title(f'{class_name.title()} Overlay', fontsize=12, fontweight='bold')
+                axes[2, cls].axis('off')
             
             # Information display
-            info_text = f"""Prediction Summary:
-            Image: {image_name}
-            Size: {prediction_result['original_size'][1]} × {prediction_result['original_size'][0]}
+            info_text = f"""Multi-Class Prediction Summary:
 
-            Dirt Detection:
-            • Total Pixels: {prediction_result['original_size'][0] * prediction_result['original_size'][1]:,}
-            • Dirt Pixels: {prediction_result['dirt_pixels']:,}
-            • Dirt Percentage: {prediction_result['dirt_percentage']:.2f}%
+Image: {image_name}
+Size: {prediction_result['original_size'][1]} × {prediction_result['original_size'][0]}
+Classes: {self.num_classes} ({', '.join(self.class_names)})
 
-            Performance:
-            • Inference Time: {prediction_result['inference_time']:.3f}s
-            • Confidence Threshold: {self.confidence_threshold}
-            • Device: {str(self.device)}"""
+Class Distribution:"""
 
-            if region_analysis and region_analysis['num_regions'] > 0:
-                info_text += f"""
+            for cls in range(self.num_classes):
+                class_name = self.class_names[cls]
+                pixels = prediction_result['class_statistics'][f'{class_name}_pixels']
+                percentage = prediction_result['class_statistics'][f'{class_name}_percentage']
+                info_text += f"\n• {class_name.title()}: {percentage:.2f}% ({pixels:,} px)"
 
-    Region Analysis:
-    • Number of Dirt Regions: {region_analysis['num_regions']}
-    • Largest Region: {region_analysis['largest_region_area']:,} pixels
-    • Average Region Size: {region_analysis['average_region_area']:.1f} pixels"""
+            if region_analysis:
+                info_text += f"\n\nRegion Analysis:"
+                for class_name in ['dirt', 'scratches']:
+                    if class_name in region_analysis:
+                        regions = region_analysis[class_name]
+                        if regions['num_regions'] > 0:
+                            info_text += f"\n• {class_name.title()}: {regions['num_regions']} regions"
+                            info_text += f"\n  Largest: {regions['largest_region_area']:,} px"
+
+            info_text += f"\n\nPerformance:"
+            info_text += f"\n• Inference: {prediction_result['inference_time']:.3f}s"
+            info_text += f"\n• Device: {str(self.device)}"
             
-            axes[1, 2].text(0.05, 0.95, info_text, transform=axes[1, 2].transAxes,
-                        verticalalignment='top', fontsize=10, fontfamily='monospace',
-                        bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
-            axes[1, 2].set_title('Prediction Information', fontsize=14, fontweight='bold')
-            axes[1, 2].axis('off')
+            axes[2, 3].text(0.05, 0.95, info_text, transform=axes[2, 3].transAxes,
+                           verticalalignment='top', fontsize=9, fontfamily='monospace',
+                           bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
+            axes[2, 3].set_title('Prediction Information', fontsize=12, fontweight='bold')
+            axes[2, 3].axis('off')
             
             # Add main title
-            fig.suptitle(f'Dirt Detection Results - {image_name}', 
+            fig.suptitle(f'Multi-Class Dirt Detection Results - {image_name}', 
                         fontsize=16, fontweight='bold')
             
             plt.tight_layout()
             
             if save_path:
                 plt.savefig(save_path, dpi=300, bbox_inches='tight')
-                self.logger.debug(f"Visualization saved to: {save_path}")
+                self.logger.debug(f"Multi-class visualization saved to: {save_path}")
             
             if show_plot:
                 plt.show()
@@ -289,17 +397,44 @@ class SingleImagePredictor(BasePredictor):
             return fig
         
         except Exception as e:
-            self.logger.error(f"Failed to create visualization: {e}")
+            self.logger.error(f"Failed to create multi-class visualization: {e}")
             return None
-    
+
+    def create_multiclass_visualization(self, class_prediction: np.ndarray) -> np.ndarray:
+        """Create colored visualization of multi-class prediction"""
+        h, w = class_prediction.shape
+        colored = np.zeros((h, w, 3), dtype=np.uint8)
+        
+        # Apply colors for each class
+        for cls in range(self.num_classes):
+            mask = class_prediction == cls
+            if cls == 0:  # Background - black
+                colored[mask] = [0, 0, 0]
+            elif cls == 1:  # Dirt - green
+                colored[mask] = [0, 255, 0]
+            elif cls == 2:  # Scratches - red
+                colored[mask] = [255, 0, 0]
+        
+        return colored
+
+    def create_multiclass_overlay(self, image: np.ndarray, class_prediction: np.ndarray) -> np.ndarray:
+        """Create overlay of multi-class prediction on original image"""
+        overlay = image.copy()
+        
+        # Dirt overlay (green)
+        dirt_mask = class_prediction == 1
+        if np.any(dirt_mask):
+            overlay[dirt_mask] = overlay[dirt_mask] * 0.3 + np.array([0, 255, 0]) * 0.7
+        
+        # Scratches overlay (red)
+        scratch_mask = class_prediction == 2
+        if np.any(scratch_mask):
+            overlay[scratch_mask] = overlay[scratch_mask] * 0.3 + np.array([255, 0, 0]) * 0.7
+        
+        return overlay.astype(np.uint8)
 
     def save_prediction_results(self, results: Dict, save_path: str) -> None:
-        """Save prediction results to JSON file
-        
-        Args:
-            results: Results dictionary to save
-            save_path: Path to save JSON file
-        """
+        """Save prediction results to JSON file - handles multi-class data"""
         try:
             # Convert numpy arrays to lists for JSON serialization
             json_results = self._convert_numpy_for_json(results)
@@ -329,63 +464,81 @@ class SingleImagePredictor(BasePredictor):
         else:
             return obj
     
-    
     def save_batch_summary(self, results: List[Dict], save_path: str):
-        """Save summary of batch processing results"""
+        """Save summary of batch processing results - updated for multi-class"""
+        # Extract multi-class statistics
+        dirt_percentages = [r['prediction']['class_statistics']['dirt_percentage'] for r in results]
+        scratch_percentages = [r['prediction']['class_statistics']['scratches_percentage'] for r in results]
+        inference_times = [r['prediction']['inference_time'] for r in results]
+        
         summary = {
             'total_images': len(results),
+            'model_info': {
+                'num_classes': results[0]['model_info']['num_classes'] if results else 3,
+                'class_names': results[0]['model_info']['class_names'] if results else self.class_names
+            },
             'summary_stats': {
-                'avg_dirt_percentage': np.mean([r['prediction']['dirt_percentage'] for r in results]),
-                'std_dirt_percentage': np.std([r['prediction']['dirt_percentage'] for r in results]),
-                'min_dirt_percentage': np.min([r['prediction']['dirt_percentage'] for r in results]),
-                'max_dirt_percentage': np.max([r['prediction']['dirt_percentage'] for r in results]),
-                'avg_inference_time': np.mean([r['prediction']['inference_time'] for r in results]),
-                'total_dirt_regions': sum([r['region_analysis']['num_regions'] for r in results])
+                'dirt': {
+                    'avg_percentage': float(np.mean(dirt_percentages)),
+                    'std_percentage': float(np.std(dirt_percentages)),
+                    'min_percentage': float(np.min(dirt_percentages)),
+                    'max_percentage': float(np.max(dirt_percentages))
+                },
+                'scratches': {
+                    'avg_percentage': float(np.mean(scratch_percentages)),
+                    'std_percentage': float(np.std(scratch_percentages)),
+                    'min_percentage': float(np.min(scratch_percentages)),
+                    'max_percentage': float(np.max(scratch_percentages))
+                },
+                'performance': {
+                    'avg_inference_time': float(np.mean(inference_times)),
+                    'total_inference_time': float(np.sum(inference_times))
+                }
             },
             'individual_results': [
                 {
                     'filename': r['image_info']['filename'],
-                    'dirt_percentage': r['prediction']['dirt_percentage'],
-                    'dirt_pixels': r['prediction']['dirt_pixels'],
-                    'num_regions': r['region_analysis']['num_regions'],
+                    'dirt_percentage': r['prediction']['class_statistics']['dirt_percentage'],
+                    'scratches_percentage': r['prediction']['class_statistics']['scratches_percentage'],
+                    'background_percentage': r['prediction']['class_statistics']['background_percentage'],
+                    'dirt_regions': r['region_analysis']['dirt']['num_regions'] if 'dirt' in r['region_analysis'] else 0,
+                    'scratch_regions': r['region_analysis']['scratches']['num_regions'] if 'scratches' in r['region_analysis'] else 0,
                     'inference_time': r['prediction']['inference_time']
                 } for r in results
             ]
         }
         
         with open(save_path, 'w') as f:
-            json.dump(summary, f, indent=2,  default=str)
+            json.dump(summary, f, indent=2, default=str)
         
-        self.logger.debug(f"Batch summary saved to: {save_path}")
+        self.logger.debug(f"Multi-class batch summary saved to: {save_path}")
 
+    # Legacy methods for backward compatibility
     def create_comparison_mask(self, prediction: np.ndarray, ground_truth: np.ndarray) -> np.ndarray:
+        """Legacy method - for multi-class, use dirt class for comparison"""
+        return self.create_multiclass_comparison_mask(prediction, ground_truth)
+
+    def create_multiclass_comparison_mask(self, prediction: np.ndarray, ground_truth: np.ndarray) -> np.ndarray:
         """
-        Create visualization mask showing pixel-level agreement (simplified for IoU focus)
-        
-        Args:
-            prediction: Binary prediction mask
-            ground_truth: Ground truth binary mask
-            
-        Returns:
-            RGB visualization mask
+        Create visualization mask for multi-class comparison
         """
         h, w = prediction.shape
         comparison = np.zeros((h, w, 3), dtype=np.uint8)
         
-        # Intersection (both predict dirt) - Green
-        intersection = np.logical_and(prediction == 1, ground_truth == 1)
-        comparison[intersection] = [0, 255, 0]  # Green for intersection
+        # Correct predictions - use class colors
+        correct_mask = (prediction == ground_truth)
+        for cls in range(self.num_classes):
+            cls_correct = np.logical_and(correct_mask, prediction == cls)
+            if cls == 0:  # Background - black
+                comparison[cls_correct] = [0, 0, 0]
+            elif cls == 1:  # Dirt - green
+                comparison[cls_correct] = [0, 255, 0]
+            elif cls == 2:  # Scratches - red
+                comparison[cls_correct] = [255, 0, 0]
         
-        # False positives (predicted but not in ground truth) - Red  
-        false_positive = np.logical_and(prediction == 1, ground_truth == 0)
-        comparison[false_positive] = [255, 0, 0]  # Red for FP
-        
-        # False negatives (in ground truth but not predicted) - Blue
-        false_negative = np.logical_and(prediction == 0, ground_truth == 1) 
-        comparison[false_negative] = [0, 0, 255]  # Blue for FN
-        
-        # True negatives (both predict clean) - Black (background)
-        # No need to set as it's already initialized to black
+        # Incorrect predictions - yellow
+        incorrect_mask = (prediction != ground_truth)
+        comparison[incorrect_mask] = [255, 255, 0]
         
         return comparison
 
@@ -394,219 +547,258 @@ class SingleImagePredictor(BasePredictor):
                         save_path: str = None, show_plot: bool = True,
                         iou_threshold: float = 0.5) -> plt.Figure:
         """
-        Create comprehensive visualization of prediction results with updated metrics
+        Legacy visualization method - updated for multi-class compatibility
         """
-        # Determine number of subplots
-        n_cols = 4 if ground_truth is not None else 3
-        fig, axes = plt.subplots(2, n_cols, figsize=(5*n_cols, 10))
-        
-        if n_cols == 3:
-            axes = axes.reshape(2, 3)
-        
-        # Original image
-        axes[0, 0].imshow(image)
-        axes[0, 0].set_title('Original Image', fontsize=14, fontweight='bold')
-        axes[0, 0].axis('off')
-        
-        # Prediction probability heatmap
-        prob_display = axes[0, 1].imshow(prediction_result['probabilities'], 
-                                    cmap='hot', vmin=0, vmax=1)
-        axes[0, 1].set_title(f'Prediction Probabilities\n(Threshold: {self.confidence_threshold})', 
-                        fontsize=14, fontweight='bold')
-        axes[0, 1].axis('off')
-        plt.colorbar(prob_display, ax=axes[0, 1], fraction=0.046, pad=0.04)
-        
-        # Binary prediction with object bounding boxes
-        binary_display = axes[0, 2].imshow(prediction_result['binary_prediction'], 
-                                        cmap='Reds', vmin=0, vmax=1)
-        
-        # Add bounding boxes for predicted objects
-        if ground_truth is not None:  # Only draw if we have ground truth for comparison
-            pred_objects = _find_objects(prediction_result['binary_prediction'])
-            for obj in pred_objects:
-                x, y, w, h = obj['bbox']
-                rect = plt.Rectangle((x, y), w, h, linewidth=1.5, edgecolor='yellow', 
-                                facecolor='none', linestyle='-')
-                axes[0, 2].add_patch(rect)
-        
-        axes[0, 2].set_title(f'Binary Prediction\n({prediction_result["dirt_percentage"]:.1f}% dirt)', 
-                        fontsize=14, fontweight='bold')
-        axes[0, 2].axis('off')
-        
-        # Ground truth with object bounding boxes (if available)
         if ground_truth is not None:
-            gt_display = axes[0, 3].imshow(ground_truth, cmap='Greens', vmin=0, vmax=1)
+            return self.visualize_multiclass_comparison(image, prediction_result, ground_truth, 
+                                                      labels, save_path, show_plot, iou_threshold)
+        else:
+            return self.visualize_multiclass_prediction(image, prediction_result, None, 
+                                                      labels.get('source_image', 'Unknown') if labels else 'Unknown',
+                                                      save_path, show_plot)
+
+    def visualize_multiclass_comparison(self, image: np.ndarray, prediction_result: Dict,
+                                      ground_truth: np.ndarray, labels: Dict = None,
+                                      save_path: str = None, show_plot: bool = True,
+                                      iou_threshold: float = 0.5) -> plt.Figure:
+        """
+        Create comparison visualization for multi-class predictions with ground truth
+        """
+        try:
+            fig, axes = plt.subplots(2, 4, figsize=(20, 10))
             
-            # Add bounding boxes for ground truth objects
-            gt_objects = _find_objects(ground_truth)
-            for obj in gt_objects:
-                x, y, w, h = obj['bbox']
-                rect = plt.Rectangle((x, y), w, h, linewidth=1.5, edgecolor='cyan', 
-                                facecolor='none', linestyle='--')
-                axes[0, 3].add_patch(rect)
+            # Original image
+            axes[0, 0].imshow(image)
+            axes[0, 0].set_title('Original Image', fontsize=12, fontweight='bold')
+            axes[0, 0].axis('off')
             
-            axes[0, 3].set_title(f'Ground Truth Mask\n({len(gt_objects)} objects)', fontsize=14, fontweight='bold')
+            # Multi-class prediction
+            class_pred_colored = self.create_multiclass_visualization(prediction_result['class_prediction'])
+            axes[0, 1].imshow(class_pred_colored)
+            axes[0, 1].set_title('Multi-Class Prediction\n(Black=BG, Green=Dirt, Red=Scratches)', 
+                               fontsize=12, fontweight='bold')
+            axes[0, 1].axis('off')
+            
+            # Ground truth (assuming it's multi-class too)
+            if len(np.unique(ground_truth)) > 2:  # Multi-class ground truth
+                gt_colored = self.create_multiclass_visualization(ground_truth)
+                axes[0, 2].imshow(gt_colored)
+                axes[0, 2].set_title('Ground Truth\n(Multi-Class)', fontsize=12, fontweight='bold')
+            else:  # Binary ground truth - treat as dirt class
+                gt_display = np.zeros((*ground_truth.shape, 3), dtype=np.uint8)
+                gt_display[ground_truth == 1] = [0, 255, 0]  # Green for dirt
+                axes[0, 2].imshow(gt_display)
+                axes[0, 2].set_title('Ground Truth\n(Binary - Dirt)', fontsize=12, fontweight='bold')
+            axes[0, 2].axis('off')
+            
+            # Comparison visualization
+            if len(np.unique(ground_truth)) > 2:
+                comparison = self.create_multiclass_comparison_mask(prediction_result['class_prediction'], ground_truth)
+            else:
+                # For binary GT, compare with dirt class prediction
+                dirt_pred = (prediction_result['class_prediction'] == 1).astype(np.uint8)
+                comparison = self.create_comparison_mask(dirt_pred, ground_truth)
+            
+            axes[0, 3].imshow(comparison)
+            axes[0, 3].set_title('Prediction vs Ground Truth\n(Yellow=Error)', fontsize=12, fontweight='bold')
             axes[0, 3].axis('off')
-        
-        # Overlay visualizations
-        # Prediction overlay on original image
-        overlay1 = image.copy()
-        dirt_mask = prediction_result['binary_prediction'] == 1
-        overlay1[dirt_mask] = overlay1[dirt_mask] * 0.3 + np.array(self.colors['dirt']) * 0.7
-        axes[1, 0].imshow(overlay1.astype(np.uint8))
-        axes[1, 0].set_title('Prediction Overlay\n(Red = Predicted Dirt)', fontsize=14, fontweight='bold')
-        axes[1, 0].axis('off')
-        
-        # Probability overlay
-        overlay2 = image.copy().astype(np.float32)
-        prob_colored = plt.cm.hot(prediction_result['probabilities'])[:, :, :3] * 255
-        alpha = prediction_result['probabilities'][:, :, np.newaxis]
-        overlay2 = overlay2 * (1 - alpha * 0.7) + prob_colored * alpha * 0.7
-        axes[1, 1].imshow(overlay2.astype(np.uint8))
-        axes[1, 1].set_title('Probability Overlay\n(Hot colormap)', fontsize=14, fontweight='bold')
-        axes[1, 1].axis('off')
-        
-        if ground_truth is not None:
-            # Comparison visualization with object bounding boxes
-            comparison = self.create_comparison_mask(prediction_result['binary_prediction'], ground_truth)
+            
+            # Bottom row - overlays and metrics
+            # Prediction overlay
+            overlay = self.create_multiclass_overlay(image, prediction_result['class_prediction'])
+            axes[1, 0].imshow(overlay)
+            axes[1, 0].set_title('Prediction Overlay', fontsize=12, fontweight='bold')
+            axes[1, 0].axis('off')
+            
+            # Class-wise probability visualization
+            # Show dirt and scratch probabilities combined
+            dirt_prob = prediction_result['class_probabilities']['dirt']
+            scratch_prob = prediction_result['class_probabilities']['scratches']
+            combined_prob = np.maximum(dirt_prob, scratch_prob)
+            
+            prob_display = axes[1, 1].imshow(combined_prob, cmap='hot', vmin=0, vmax=1)
+            axes[1, 1].set_title('Max Defect Probability\n(Dirt or Scratches)', fontsize=12, fontweight='bold')
+            axes[1, 1].axis('off')
+            plt.colorbar(prob_display, ax=axes[1, 1], fraction=0.046, pad=0.04)
+            
+            # Error visualization
             axes[1, 2].imshow(comparison)
-            
-            # Draw bounding boxes for detected objects
-            pred_objects = _find_objects(prediction_result['binary_prediction'])
-            gt_objects = _find_objects(ground_truth)
-            
-            # Draw predicted object bounding boxes in yellow
-            for i, obj in enumerate(pred_objects):
-                x, y, w, h = obj['bbox']
-                rect = plt.Rectangle((x, y), w, h, linewidth=2, edgecolor='yellow', 
-                                facecolor='none', linestyle='-')
-                axes[1, 2].add_patch(rect)
-            
-            # Draw ground truth object bounding boxes in cyan
-            for i, obj in enumerate(gt_objects):
-                x, y, w, h = obj['bbox']
-                rect = plt.Rectangle((x, y), w, h, linewidth=2, edgecolor='cyan', 
-                                facecolor='none', linestyle='--')
-                axes[1, 2].add_patch(rect)
-            
-            axes[1, 2].set_title(f'Pixel + Object Comparison\n(Pred: {len(pred_objects)}, GT: {len(gt_objects)} objects)', 
-                            fontsize=14, fontweight='bold')
+            axes[1, 2].set_title('Error Analysis\n(Yellow=Misclassified)', fontsize=12, fontweight='bold')
             axes[1, 2].axis('off')
             
-            # Create custom legend for pixel-level comparison and object boxes
-            legend_elements = [
-                mpatches.Patch(color=[0, 1, 0], label='Intersection (Both Positive)'),
-                mpatches.Patch(color=[1, 0, 0], label='False Positive'),
-                mpatches.Patch(color=[0, 0, 1], label='False Negative'),
-                mpatches.Patch(color='black', label='True Negative'),
-                plt.Line2D([0], [0], color='yellow', linewidth=2, label='Predicted Objects'),
-                plt.Line2D([0], [0], color='cyan', linewidth=2, linestyle='--', label='GT Objects')
-            ]
-            axes[1, 2].legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1, 1))
-            
-            # Updated metrics display
-            metrics = calculate_metrics(prediction_result['binary_prediction'], ground_truth, iou_threshold)
-            
-            metrics_text = f"""PIXEL-LEVEL METRICS:
-    IoU: {metrics['pixel_iou']:.3f}
-    Dice: {metrics['pixel_dice']:.3f}
-    Intersection: {metrics['pixel_intersection']:,}
-    Union: {metrics['pixel_union']:,}
+            # Calculate and display metrics
+            if len(np.unique(ground_truth)) > 2:
+                # Multi-class metrics
+                metrics_text = self._calculate_multiclass_metrics_text(prediction_result['class_prediction'], ground_truth)
+            else:
+                # Binary metrics for dirt class
+                dirt_pred = (prediction_result['class_prediction'] == 1).astype(np.uint8)
+                metrics = calculate_metrics(dirt_pred, ground_truth, iou_threshold)
+                metrics_text = f"""BINARY DIRT METRICS:
+IoU: {metrics.get('pixel_iou', 0):.3f}
+Dice: {metrics.get('pixel_dice', 0):.3f}
+Precision: {metrics.get('object_precision', 0):.3f}
+Recall: {metrics.get('object_recall', 0):.3f}
+F1-Score: {metrics.get('object_f1', 0):.3f}
 
-    OBJECT-LEVEL METRICS:
-    True Positives: {metrics['object_tp']}
-    False Positives: {metrics['object_fp']}  
-    False Negatives: {metrics['object_fn']}
-    Precision: {metrics['object_precision']:.3f}
-    Recall: {metrics['object_recall']:.3f}
-    F1-Score: {metrics['object_f1']:.3f}
-
-    DETECTION INFO:
-    Detected Objects: {metrics['detected_objects']}
-    GT Objects: {metrics['ground_truth_objects']}
-    IoU Threshold: {iou_threshold}
-    Avg Matched IoU: {metrics.get('avg_matched_iou', 0):.3f}
-
-    Inference Time: {prediction_result['inference_time']:.3f}s"""
+CLASS STATISTICS:"""
+                for cls in range(self.num_classes):
+                    class_name = self.class_names[cls]
+                    percentage = prediction_result['class_statistics'][f'{class_name}_percentage']
+                    metrics_text += f"\n{class_name.title()}: {percentage:.2f}%"
+                
+                metrics_text += f"\n\nInference: {prediction_result['inference_time']:.3f}s"
             
             axes[1, 3].text(0.05, 0.95, metrics_text, transform=axes[1, 3].transAxes,
-                        verticalalignment='top', fontsize=10, fontfamily='monospace',
-                        bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.8))
-            axes[1, 3].set_title('Performance Metrics', fontsize=14, fontweight='bold')
+                           verticalalignment='top', fontsize=10, fontfamily='monospace',
+                           bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.8))
+            axes[1, 3].set_title('Performance Metrics', fontsize=12, fontweight='bold')
             axes[1, 3].axis('off')
-        else:
-            # Information display without ground truth
-            info_text = f"""Prediction Info:
-    Dirt Pixels: {prediction_result['dirt_pixels']:,}
-    Dirt Percentage: {prediction_result['dirt_percentage']:.2f}%
-    Confidence Threshold: {self.confidence_threshold}
-    Inference Time: {prediction_result['inference_time']:.3f}s
-    Image Size: {prediction_result['original_size']}"""
             
-            axes[1, 2].text(0.05, 0.95, info_text, transform=axes[1, 2].transAxes,
-                        verticalalignment='top', fontsize=12, fontfamily='monospace',
-                        bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.8))
-            axes[1, 2].set_title('Prediction Information', fontsize=14, fontweight='bold')
-            axes[1, 2].axis('off')
-        
-        # Add labels information if available
-        if labels:
-            label_text = f"""Labels Info:
-    Total Objects: {labels.get('total_objects', 'N/A')}
-    Dirt Objects: {labels.get('dirt_objects', 'N/A')}
-    Clean Objects: {labels.get('clean_objects', 'N/A')}"""
+            # Add main title
+            if labels:
+                title = f"Multi-Class Comparison - {labels.get('source_image', 'Unknown')}"
+            else:
+                title = "Multi-Class Dirt Detection Comparison"
+            fig.suptitle(title, fontsize=16, fontweight='bold')
             
-            title_text = f"Sample from: {labels.get('source_image', 'Unknown')}"
-            fig.suptitle(title_text, fontsize=16, fontweight='bold')
+            plt.tight_layout()
+            
+            if save_path:
+                plt.savefig(save_path, dpi=300, bbox_inches='tight')
+                self.logger.debug(f"Multi-class comparison saved to: {save_path}")
+            
+            if show_plot:
+                plt.show()
+            
+            return fig
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create multi-class comparison visualization: {e}")
+            return None
+
+    def _calculate_multiclass_metrics_text(self, prediction: np.ndarray, ground_truth: np.ndarray) -> str:
+        """Calculate and format multi-class metrics"""
+        try:
+            # Convert to torch tensors for metric calculation
+            import torch
+            pred_tensor = torch.from_numpy(prediction).unsqueeze(0).unsqueeze(0)  # Add batch and channel dims
+            gt_tensor = torch.from_numpy(ground_truth).unsqueeze(0)
+            
+            # Calculate multi-class IoU and Dice
+            iou_metrics = calculate_multiclass_iou(pred_tensor, gt_tensor, self.num_classes)
+            dice_metrics = calculate_multiclass_dice(pred_tensor, gt_tensor, self.num_classes)
+            
+            metrics_text = "MULTI-CLASS METRICS:\n"
+            metrics_text += f"Mean IoU: {iou_metrics.get('mean_iou', 0):.3f}\n"
+            metrics_text += f"Mean Dice: {dice_metrics.get('mean_dice', 0):.3f}\n\n"
+            
+            # Per-class metrics
+            for cls in range(self.num_classes):
+                class_name = self.class_names[cls]
+                iou_key = f'iou_class_{cls}'
+                dice_key = f'dice_class_{cls}'
+                
+                if iou_key in iou_metrics and dice_key in dice_metrics:
+                    metrics_text += f"{class_name.title()}:\n"
+                    metrics_text += f"  IoU: {iou_metrics[iou_key]:.3f}\n"
+                    metrics_text += f"  Dice: {dice_metrics[dice_key]:.3f}\n"
+            
+            return metrics_text
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to calculate multi-class metrics: {e}")
+            return "METRICS: Calculation failed"
+
+    def predict_and_compare_mask(self, input_path: str, output_dir: str):
+        """Updated for multi-class dataset comparison"""
+        input_path = Path(input_path)
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
         
-        plt.tight_layout()
-        
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            self.logger.debug(f"Visualization saved to: {save_path}")
-        
-        if show_plot:
-            plt.show()
-        
-        return fig
-    
-    def predict_and_compare_mask(self, input_path:str, output_dir:str):
         # Check if it's a dataset sample directory
-        required_files = ['synthetic_dirty_patch.png', 'segmentation_mask_patch.png', 'labels_patch.json']
+        required_files = ['synthetic_dirty_patch.png', 'segmentation_mask_patch_multiclass.png', 'labels_patch.json']
+        fallback_files = ['synthetic_dirty_patch.png', 'segmentation_mask_patch.png', 'labels_patch.json']
 
         if all((input_path / file).exists() for file in required_files):
-            # Single dataset sample
-            print(f"Running inference on dataset sample: {input_path}")
+            # Multi-class dataset sample
+            print(f"Running multi-class inference on dataset sample: {input_path}")
             try:
-                image, ground_truth, labels = load_ground_truth_data(str(input_path), self.logger)
+                image, ground_truth, labels = load_ground_truth_data(str(input_path), self.logger, multiclass=True)
                 prediction_result = self.predict(image)
                 
-                # Save visualization with ground truth comparison
-                output_path = output_dir / f"{input_path.name}_inference.png"
-                self.visualize_prediction(
+                # Save multi-class comparison visualization
+                output_path = output_dir / f"{input_path.name}_multiclass_inference.png"
+                self.visualize_multiclass_comparison(
                     image, prediction_result, ground_truth, labels,
                     save_path=str(output_path), show_plot=False
                 )
                 
-                # Calculate and display metrics
-                metrics = calculate_metrics(prediction_result['binary_prediction'], ground_truth)
+                # Calculate and display multi-class metrics
+                self._print_multiclass_comparison_metrics(prediction_result, ground_truth)
                 
-                print(f"Inference completed!")
-                print(f"Metrics:")
-                print(f"  Pixel IoU: {metrics['pixel_iou']:.3f}")
-                print(f"  Pixel Dice: {metrics['pixel_dice']:.3f}")
-                print(f"  Object Precision: {metrics['object_precision']:.3f}")
-                print(f"  Object Recall: {metrics['object_recall']:.3f}")
-                print(f"  Object F1-Score: {metrics['object_f1']:.3f}")
-                print(f"  Dirt percentage: {prediction_result['dirt_percentage']:.2f}%")
-                print(f"  Inference time: {prediction_result['inference_time']:.3f}s")
+                print(f"Multi-class inference completed!")
                 print(f"Results saved to: {output_path}")
                 
             except Exception as e:
-                print(f"Error processing dataset sample: {e}")
+                print(f"Error processing multi-class dataset sample: {e}")
+                
+        elif all((input_path / file).exists() for file in fallback_files):
+            # Binary dataset sample - treat as legacy
+            print(f"Running inference on binary dataset sample (legacy mode): {input_path}")
+            try:
+                image, ground_truth, labels = load_ground_truth_data(str(input_path), self.logger, multiclass=False)
+                prediction_result = self.predict(image)
+                
+                # Save visualization with ground truth comparison
+                output_path = output_dir / f"{input_path.name}_inference.png"
+                self.visualize_multiclass_comparison(
+                    image, prediction_result, ground_truth, labels,
+                    save_path=str(output_path), show_plot=False
+                )
+                
+                # Calculate metrics comparing dirt class to binary ground truth
+                dirt_pred = (prediction_result['class_prediction'] == 1).astype(np.uint8)
+                metrics = calculate_metrics(dirt_pred, ground_truth)
+                
+                print(f"Inference completed!")
+                print(f"Metrics (Dirt class vs Binary GT):")
+                print(f"  Pixel IoU: {metrics.get('pixel_iou', 0):.3f}")
+                print(f"  Pixel Dice: {metrics.get('pixel_dice', 0):.3f}")
+                print(f"Results saved to: {output_path}")
+                
+            except Exception as e:
+                print(f"Error processing binary dataset sample: {e}")
         else:
             print("Directory does not contain required dataset files.")
-            print("Use --batch_mode for dataset directory with multiple samples.")
+            print("Required for multi-class: synthetic_dirty_patch.png, segmentation_mask_patch_multiclass.png, labels_patch.json")
+            print("Required for binary: synthetic_dirty_patch.png, segmentation_mask_patch.png, labels_patch.json")
 
-    def batch_predict_and_compare_mask(self, ):
-        pass    
+    def _print_multiclass_comparison_metrics(self, prediction_result: Dict, ground_truth: np.ndarray):
+        """Print detailed multi-class comparison metrics"""
+        try:
+            import torch
+            pred_tensor = torch.from_numpy(prediction_result['class_prediction']).unsqueeze(0).unsqueeze(0)
+            gt_tensor = torch.from_numpy(ground_truth).unsqueeze(0)
+            
+            iou_metrics = calculate_multiclass_iou(pred_tensor, gt_tensor, self.num_classes)
+            dice_metrics = calculate_multiclass_dice(pred_tensor, gt_tensor, self.num_classes)
+            
+            print(f"\nMulti-Class Metrics:")
+            print(f"  Mean IoU: {iou_metrics.get('mean_iou', 0):.3f}")
+            print(f"  Mean Dice: {dice_metrics.get('mean_dice', 0):.3f}")
+            
+            for cls in range(self.num_classes):
+                class_name = self.class_names[cls]
+                iou_val = iou_metrics.get(f'iou_class_{cls}', 0)
+                dice_val = dice_metrics.get(f'dice_class_{cls}', 0)
+                class_pct = prediction_result['class_statistics'][f'{class_name}_percentage']
+                
+                print(f"  {class_name.title()}: IoU={iou_val:.3f}, Dice={dice_val:.3f}, Coverage={class_pct:.2f}%")
+                
+        except Exception as e:
+            print(f"Failed to calculate detailed metrics: {e}")
+
+    def batch_predict_and_compare_mask(self):
+        """Placeholder for batch comparison - to be implemented"""
+        pass

@@ -4,7 +4,7 @@ import time
 import random
 import logging
 from pathlib import Path
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, List
 
 import torch
 import numpy as np
@@ -17,11 +17,12 @@ from sklearn.model_selection import train_test_split
 
 from config.training import TrainingConfig
 from src.models.unet import UNet
+from src.synthesis.image_operations import ImageOperations
 from src.utils.memory_utils import MemoryTracker
-from src.training.metrics import calculate_dice, calculate_iou
-from src.training.losses import CombinedLoss
+from src.training.metrics import calculate_multiclass_iou, calculate_multiclass_dice
+from src.training.losses import MultiClassCombinedLoss
 from src.core.device_utils import get_device_info
-from src.data.segmentation_dataset import SegmentationDataset
+from src.data.segmentation_dataset import MultiClassSegmentationDataset
 from src.data.transformations import get_train_transforms, get_val_transforms
 from src.utils.visualization_utils import plot_training_history
 from src.training.helper import CheckpointManager, EarlyStopping
@@ -40,12 +41,24 @@ def set_seed(seed: int = 42):
 def train_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Module, 
                 optimizer: optim.Optimizer, device: torch.device, scaler: GradScaler,
                 accumulation_steps: int = 1, use_amp: bool = True, 
+                num_classes: int = 3, class_names: List[str] = None,
                 logger: logging.Logger = None, memory_tracker: MemoryTracker = None) -> Tuple[float, Dict[str, float]]:
+    
+    if class_names is None:
+        class_names = ['background', 'dirt', 'scratches']
     
     epoch_start_time = time.time()
     model.train()
     total_loss = 0
-    metrics = {'iou': 0, 'dice': 0}
+    
+    # Initialize metrics dict with all class-specific metrics
+    metrics = {}
+    for name in class_names:
+        metrics[f'iou_{name}'] = 0
+        metrics[f'dice_{name}'] = 0
+    metrics['mean_iou'] = 0
+    metrics['mean_dice'] = 0
+    
     num_batches = 0
     optimizer.zero_grad()
     
@@ -67,12 +80,29 @@ def train_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Module,
                 outputs = model(images)
                 loss = criterion(outputs, masks) / accumulation_steps
             
-            # Calculate metrics
-            batch_iou = calculate_iou(outputs, masks)
-            batch_dice = calculate_dice(outputs, masks)
+            # Calculate multi-class metrics
+            batch_ious = calculate_multiclass_iou(outputs, masks, num_classes)
+            batch_dice = calculate_multiclass_dice(outputs, masks, num_classes)
             
-            metrics['iou'] += batch_iou
-            metrics['dice'] += batch_dice
+            # Accumulate metrics
+            for key in batch_ious:
+                if key == 'mean_iou':
+                    metrics['mean_iou'] += batch_ious[key]
+                else:
+                    # Map class indices to names
+                    for i, name in enumerate(class_names):
+                        if key == f'iou_class_{i}':
+                            metrics[f'iou_{name}'] += batch_ious[key]
+            
+            for key in batch_dice:
+                if key == 'mean_dice':
+                    metrics['mean_dice'] += batch_dice[key]
+                else:
+                    # Map class indices to names
+                    for i, name in enumerate(class_names):
+                        if key == f'dice_class_{i}':
+                            metrics[f'dice_{name}'] += batch_dice[key]
+            
             num_batches += 1
             
             # Backward pass
@@ -97,8 +127,8 @@ def train_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Module,
             # Update progress bar
             progress_bar.set_postfix({
                 'Loss': f'{loss.item() * accumulation_steps:.4f}',
-                'IoU': f'{batch_iou:.4f}',
-                'Dice': f'{batch_dice:.4f}',
+                'mIoU': f'{batch_ious["mean_iou"]:.4f}',
+                'mDice': f'{batch_dice["mean_dice"]:.4f}',
                 'Time': f'{batch_time:.2f}s'
             })
             
@@ -132,6 +162,7 @@ def train_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Module,
     avg_loss = total_loss / len(dataloader) if len(dataloader) > 0 else float('inf')
     avg_batch_time = np.mean(batch_times) if batch_times else 0
     
+    # Average metrics
     for key in metrics:
         metrics[key] = metrics[key] / num_batches if num_batches > 0 else 0.0
     
@@ -140,22 +171,39 @@ def train_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Module,
         logger.info(f"Training epoch completed in {epoch_time:.2f}s")
         logger.info(f"Average batch time: {avg_batch_time:.3f}s")
         logger.info(f"Training loss: {avg_loss:.4f}")
-        logger.info(f"Training IoU: {metrics['iou']:.4f}")
-        logger.info(f"Training Dice: {metrics['dice']:.4f}")
+        logger.info(f"Training mean IoU: {metrics['mean_iou']:.4f}")
+        logger.info(f"Training mean Dice: {metrics['mean_dice']:.4f}")
+        
+        # Log per-class metrics
+        for name in class_names:
+            logger.info(f"  {name} - IoU: {metrics[f'iou_{name}']:.4f}, Dice: {metrics[f'dice_{name}']:.4f}")
     
     if memory_tracker:
         memory_tracker.log_memory_usage(logger, "at epoch end")
     
     return avg_loss, metrics
 
+
 def validate_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Module, 
                   device: torch.device, use_amp: bool = True, 
+                  num_classes: int = 3, class_names: List[str] = None,
                   logger: logging.Logger = None, memory_tracker: MemoryTracker = None) -> Tuple[float, Dict[str, float]]:
+    
+    if class_names is None:
+        class_names = ['background', 'dirt', 'scratches']
     
     epoch_start_time = time.time()
     model.eval()
     total_loss = 0
-    metrics = {'iou': 0, 'dice': 0}
+    
+    # Initialize metrics dict
+    metrics = {}
+    for name in class_names:
+        metrics[f'iou_{name}'] = 0
+        metrics[f'dice_{name}'] = 0
+    metrics['mean_iou'] = 0
+    metrics['mean_dice'] = 0
+    
     num_batches = 0
     
     with torch.no_grad():
@@ -173,12 +221,27 @@ def validate_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Modul
                     outputs = model(images)
                     loss = criterion(outputs, masks)
                 
-                # Calculate metrics
-                batch_iou = calculate_iou(outputs, masks)
-                batch_dice = calculate_dice(outputs, masks)
+                # Calculate multi-class metrics
+                batch_ious = calculate_multiclass_iou(outputs, masks, num_classes)
+                batch_dice = calculate_multiclass_dice(outputs, masks, num_classes)
                 
-                metrics['iou'] += batch_iou
-                metrics['dice'] += batch_dice
+                # Accumulate metrics
+                for key in batch_ious:
+                    if key == 'mean_iou':
+                        metrics['mean_iou'] += batch_ious[key]
+                    else:
+                        for i, name in enumerate(class_names):
+                            if key == f'iou_class_{i}':
+                                metrics[f'iou_{name}'] += batch_ious[key]
+                
+                for key in batch_dice:
+                    if key == 'mean_dice':
+                        metrics['mean_dice'] += batch_dice[key]
+                    else:
+                        for i, name in enumerate(class_names):
+                            if key == f'dice_class_{i}':
+                                metrics[f'dice_{name}'] += batch_dice[key]
+                
                 num_batches += 1
                 
                 total_loss += loss.item()
@@ -187,8 +250,8 @@ def validate_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Modul
                 
                 progress_bar.set_postfix({
                     'Loss': f'{loss.item():.4f}',
-                    'IoU': f'{batch_iou:.4f}',
-                    'Dice': f'{batch_dice:.4f}',
+                    'mIoU': f'{batch_ious["mean_iou"]:.4f}',
+                    'mDice': f'{batch_dice["mean_dice"]:.4f}',
                     'Time': f'{batch_time:.2f}s'
                 })
                 
@@ -208,6 +271,7 @@ def validate_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Modul
     avg_loss = total_loss / len(dataloader) if len(dataloader) > 0 else float('inf')
     avg_batch_time = np.mean(batch_times) if batch_times else 0
     
+    # Average metrics
     for key in metrics:
         metrics[key] = metrics[key] / num_batches if num_batches > 0 else 0.0
     
@@ -216,13 +280,18 @@ def validate_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Modul
         logger.info(f"Validation epoch completed in {epoch_time:.2f}s")
         logger.info(f"Average batch time: {avg_batch_time:.3f}s")
         logger.info(f"Validation loss: {avg_loss:.4f}")
-        logger.info(f"Validation IoU: {metrics['iou']:.4f}")
-        logger.info(f"Validation Dice: {metrics['dice']:.4f}")
+        logger.info(f"Validation mean IoU: {metrics['mean_iou']:.4f}")
+        logger.info(f"Validation mean Dice: {metrics['mean_dice']:.4f}")
+        
+        # Log per-class metrics
+        for name in class_names:
+            logger.info(f"  {name} - IoU: {metrics[f'iou_{name}']:.4f}, Dice: {metrics[f'dice_{name}']:.4f}")
     
     return avg_loss, metrics
 
-def train_model(config: TrainingConfig, logger:logging.Logger, arch_config:str) -> Tuple[nn.Module, Dict]:
-    """Enhanced main training function with comprehensive logging and checkpointing"""
+
+def train_model(config: TrainingConfig, image_ops: ImageOperations, logger: logging.Logger, arch_config: str) -> Tuple[nn.Module, Dict]:
+    """Enhanced main training function for multi-class segmentation"""
     
     # Setup
     set_seed()
@@ -230,9 +299,8 @@ def train_model(config: TrainingConfig, logger:logging.Logger, arch_config:str) 
     save_dir.mkdir(parents=True, exist_ok=True)
     
     # Initialize logging
-    # logger = setup_logging(save_dir)
     logger.info("=" * 80)
-    logger.info("TRAINING SESSION STARTED")
+    logger.info("MULTI-CLASS SEGMENTATION TRAINING SESSION STARTED")
     logger.info("=" * 80)
     
     # Initialize memory tracking
@@ -263,16 +331,22 @@ def train_model(config: TrainingConfig, logger:logging.Logger, arch_config:str) 
         logger.info("CUDA optimizations enabled")
     
     # Create dataset
-    logger.info("Loading dataset...")
-    full_dataset = SegmentationDataset(
+    logger.info("Loading multi-class dataset...")
+    full_dataset = MultiClassSegmentationDataset(
         root_dir=config.root_dir,
-        target_size=config.target_size
+        target_size=config.target_size,
+        image_ops=image_ops,
+        num_classes=config.num_classes,
+        app_logger=logger
     )
     
     if len(full_dataset) == 0:
         raise ValueError(f"No valid samples found in {config.root_dir}")
     
     logger.info(f"Total samples found: {len(full_dataset)}")
+    
+    # Get class distribution
+    class_distribution = full_dataset.get_class_distribution()
     
     # Split dataset
     train_indices, val_indices = train_test_split(
@@ -315,10 +389,10 @@ def train_model(config: TrainingConfig, logger:logging.Logger, arch_config:str) 
     logger.info(f'Effective batch size: {config.batch_size * config.accumulation_steps}')
     
     # Initialize model
-    logger.info("Initializing model...")
+    logger.info("Initializing multi-class U-Net model...")
     model = UNet(
-        n_channels=3, 
-        n_classes=config.num_classes, 
+        n_channels=1,  # RGB input
+        n_classes=config.num_classes,  # 3 classes
         bilinear=True,
         architecture=config.model_architecture,
         app_logger=logger,
@@ -334,9 +408,21 @@ def train_model(config: TrainingConfig, logger:logging.Logger, arch_config:str) 
     logger.info(f"Total parameters: {total_params:,}")
     logger.info(f"Trainable parameters: {trainable_params:,}")
     logger.info(f"Model size: {model_size_mb:.2f} MB")
+    logger.info(f"Output classes: {config.num_classes} ({', '.join(config.class_names)})")
+    
+    # Create class weights tensor
+    if hasattr(config, 'class_weights') and config.class_weights:
+        class_weights = torch.tensor(config.class_weights, dtype=torch.float32, device=device)
+        logger.info(f"Using class weights: {config.class_weights}")
+    else:
+        class_weights = None
     
     # Loss function and optimizer
-    criterion = CombinedLoss()
+    criterion = MultiClassCombinedLoss(
+        num_classes=config.num_classes,
+        class_weights=class_weights
+    )
+    
     optimizer = optim.AdamW(model.parameters(), lr=config.learning_rate, weight_decay=1e-5)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer, mode='min', patience=5, factor=0.5, min_lr=1e-7, verbose=True
@@ -352,16 +438,24 @@ def train_model(config: TrainingConfig, logger:logging.Logger, arch_config:str) 
     history = {
         'train_losses': [],
         'val_losses': [],
-        'train_metrics': {'iou': [], 'dice': []},
-        'val_metrics': {'iou': [], 'dice': []},
+        'train_metrics': {},
+        'val_metrics': {},
         'lr_history': [],
         'epoch_times': []
     }
     
+    # Initialize per-class metric tracking
+    for metric_type in ['train_metrics', 'val_metrics']:
+        history[metric_type]['mean_iou'] = []
+        history[metric_type]['mean_dice'] = []
+        for name in config.class_names:
+            history[metric_type][f'iou_{name}'] = []
+            history[metric_type][f'dice_{name}'] = []
+    
     best_val_loss = float('inf')
     best_model_path = save_dir / 'best_model.pth'
     
-    logger.info("Starting training...")
+    logger.info("Starting multi-class training...")
     memory_tracker.log_memory_usage(logger, "before training")
     
     training_start_time = time.time()
@@ -380,12 +474,14 @@ def train_model(config: TrainingConfig, logger:logging.Logger, arch_config:str) 
         # Train
         train_loss, train_metrics = train_epoch(
             model, train_loader, criterion, optimizer, device, scaler,
-            config.accumulation_steps, config.use_amp, logger, memory_tracker
+            config.accumulation_steps, config.use_amp, config.num_classes,
+            config.class_names, logger, memory_tracker
         )
         
         # Validate
         val_loss, val_metrics = validate_epoch(
-            model, val_loader, criterion, device, config.use_amp, logger, memory_tracker
+            model, val_loader, criterion, device, config.use_amp,
+            config.num_classes, config.class_names, logger, memory_tracker
         )
         
         # Calculate epoch time
@@ -401,17 +497,19 @@ def train_model(config: TrainingConfig, logger:logging.Logger, arch_config:str) 
         history['lr_history'].append(current_lr)
         history['epoch_times'].append(epoch_time)
         
-        for metric_name in ['iou', 'dice']:
-            history['train_metrics'][metric_name].append(train_metrics[metric_name])
-            history['val_metrics'][metric_name].append(val_metrics[metric_name])
+        # Save metrics
+        for key, value in train_metrics.items():
+            history['train_metrics'][key].append(value)
+        for key, value in val_metrics.items():
+            history['val_metrics'][key].append(value)
         
         # Log epoch summary
         logger.info("=" * 50)
         logger.info(f"EPOCH {epoch+1} SUMMARY")
         logger.info("=" * 50)
         logger.info(f'Epoch time: {epoch_time:.2f} seconds ({epoch_time/60:.1f} minutes)')
-        logger.info(f'Train Loss: {train_loss:.4f}, Train IoU: {train_metrics["iou"]:.4f}, Train Dice: {train_metrics["dice"]:.4f}')
-        logger.info(f'Val Loss: {val_loss:.4f}, Val IoU: {val_metrics["iou"]:.4f}, Val Dice: {val_metrics["dice"]:.4f}')
+        logger.info(f'Train Loss: {train_loss:.4f}')
+        logger.info(f'Val Loss: {val_loss:.4f}')
         logger.info(f'Learning Rate: {current_lr:.6f}')
         
         # Save best model
@@ -467,7 +565,7 @@ def train_model(config: TrainingConfig, logger:logging.Logger, arch_config:str) 
     
     # Training completion summary
     logger.info("=" * 80)
-    logger.info("TRAINING COMPLETED!")
+    logger.info("MULTI-CLASS TRAINING COMPLETED!")
     logger.info("=" * 80)
     logger.info(f"Total training time: {total_training_time:.2f} seconds ({total_training_time/60:.1f} minutes)")
     logger.info(f"Average epoch time: {np.mean(history['epoch_times'][1:]):.2f} seconds")
@@ -476,6 +574,13 @@ def train_model(config: TrainingConfig, logger:logging.Logger, arch_config:str) 
     logger.info(f"Best model saved at: {best_model_path}")
     logger.info(f"Training history saved at: {history_path}")
     logger.info(f"Training plots saved at: {plot_path}")
+    
+    # Log final per-class performance
+    logger.info("\nFinal Per-Class Performance:")
+    for name in config.class_names:
+        final_iou = history['val_metrics'][f'iou_{name}'][-1] if history['val_metrics'][f'iou_{name}'] else 0
+        final_dice = history['val_metrics'][f'dice_{name}'][-1] if history['val_metrics'][f'dice_{name}'] else 0
+        logger.info(f"  {name}: IoU={final_iou:.4f}, Dice={final_dice:.4f}")
     
     memory_tracker.log_memory_usage(logger, "after training")
     memory_tracker.cleanup()

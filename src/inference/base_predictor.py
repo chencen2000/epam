@@ -27,18 +27,22 @@ class BasePredictor(ABC):
         self.model = None
         self.config = None
 
-        # Color scheme for visualization
+        # Updated color scheme for multi-class visualization
         self.colors = {
-            'background': (0, 0, 0),
-            'dirt': (255, 0, 0),
-            'ground_truth': (0, 255, 0),
-            'true_positive': (255, 255, 0),
-            'false_positive': (255, 0, 255),
-            'false_negative': (0, 255, 255),
+            'background': (0, 0, 0),        # Black
+            'dirt': (0, 255, 0),           # Green
+            'scratches': (255, 0, 0),      # Red
+            'ground_truth': (0, 255, 255), # Cyan
+            'true_positive': (255, 255, 0), # Yellow
+            'false_positive': (255, 0, 255), # Magenta
+            'false_negative': (0, 255, 255), # Cyan
             'original': (128, 128, 128),
             'screen_boundary': (0, 255, 0),
             'patch_boundary': (255, 255, 0),
         }
+        
+        # Class names for multi-class
+        self.class_names = ['background', 'dirt', 'scratches']
         
         self.load_model(model_path)
 
@@ -58,13 +62,19 @@ class BasePredictor(ABC):
         
         self.config = checkpoint.get('config', {})
         self.architecture = self.config.get('model_architecture', 'standard')
+        self.logger.debug(f"architecture = {self.architecture}")
+        
+        # FIXED: Use correct channel count and classes for multi-class
+        num_classes = self.config.get('num_classes', 3)  # Default to 3 for multi-class
+        self.logger.debug(f"num_class = {num_classes}")
         
         self.model = UNet(
-            n_channels=3,
-            n_classes=self.config.get('num_classes', 1),
+            n_channels=1,  # FIXED: Grayscale input, not 3
+            n_classes=num_classes,  # FIXED: Use actual number of classes
             bilinear=True,
             architecture=self.architecture,
             app_logger=self.logger,
+            config_path="config/models/light_weight.yaml"
         ).to(self.device)
         
         self.model.load_state_dict(checkpoint['model_state_dict'])
@@ -73,6 +83,7 @@ class BasePredictor(ABC):
         self.logger.debug(f"Model loaded successfully!")
         self.logger.debug(f"Architecture: {self.architecture}")
         self.logger.debug(f"Device: {self.device}")
+        self.logger.debug(f"Number of classes: {num_classes}")
         self.logger.debug(f"Model parameters: {sum(p.numel() for p in self.model.parameters()):,}")
 
     @abstractmethod
