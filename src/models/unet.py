@@ -53,6 +53,18 @@ class Down(nn.Module):
         return self.maxpool_conv(x)
 
 
+class ModifiedDown(nn.Module):
+    """Downscaling with stride conv then double conv (for modified architecture)"""
+    def __init__(self, in_channels: int, out_channels: int):
+        super().__init__()
+        self.down = nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=2, padding=1, bias=False)
+        self.double_conv = DoubleConv(in_channels, out_channels)
+
+    def forward(self, x):
+        x = self.down(x)
+        return self.double_conv(x)
+
+
 class Up(nn.Module):
     """Upscaling then double conv"""
     def __init__(self, in_channels, out_channels, bilinear=True, dilation: bool = False):
@@ -77,6 +89,23 @@ class Up(nn.Module):
         return self.conv(x)
 
 
+class ModifiedUp(nn.Module):
+    """Upscaling with explicit channel management (for modified architecture)"""
+    def __init__(self, up_in_channels: int, skip_channels: int, out_channels: int):
+        super().__init__()
+        self.up = nn.ConvTranspose2d(up_in_channels, skip_channels, kernel_size=2, stride=2)
+        self.double_conv = DoubleConv(skip_channels * 2, out_channels)
+
+    def forward(self, x1, x2):
+        x1 = self.up(x1)  # now x1 has skip_channels channels
+        diffY = x2.size(2) - x1.size(2)
+        diffX = x2.size(3) - x1.size(3)
+        x1 = F.pad(x1, [diffX // 2, diffX - diffX // 2,
+                        diffY // 2, diffY - diffY // 2])
+        x = torch.cat([x2, x1], dim=1)
+        return self.double_conv(x)
+
+
 class OutConv(nn.Module):
     def __init__(self, in_channels: int, out_channels: int):
         super().__init__()
@@ -93,13 +122,19 @@ class UNet(nn.Module):
                  bilinear: bool = False, 
                  config_path: Optional[str] = None,
                  config_dict: Optional[Dict[str, Any]] = None,
-                 architecture: str = "standard",  # kept for backward compatibility
+                 architecture: str = "standard",  # options: "standard", "lightweight", "modified"
                  app_logger: Optional[logging.Logger] = None):
         super(UNet, self).__init__()
         
         if app_logger is None:
             app_logger = setup_application_logger()
         self.logger = app_logger.getChild('UNet')
+        
+        # For modified architecture, force n_channels to 1
+        if architecture == "modified":
+            if n_channels != 1:
+                self.logger.warning(f"Modified architecture requires n_channels=1, but {n_channels} was provided. Setting to 1.")
+                n_channels = 1
         
         self.n_channels = n_channels
         self.n_classes = n_classes
@@ -119,8 +154,11 @@ class UNet(nn.Module):
             elif architecture == "lightweight":
                 self.logger.info("Using UNet - Lightweight architecture")
                 self._build_lightweight_architecture()
+            elif architecture == "modified":
+                self.logger.info("Using UNet - Modified (SlimUNet) architecture")
+                self._build_modified_architecture()
             else:
-                raise ValueError(f"Unknown architecture: {architecture}. Use config_path or config_dict for dynamic architectures.")
+                raise ValueError(f"Unknown architecture: {architecture}. Use 'standard', 'lightweight', 'modified', or provide config_path/config_dict for dynamic architectures.")
 
     def _load_config(self, config_path: Optional[str], config_dict: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Load configuration from file or dictionary"""
@@ -232,13 +270,33 @@ class UNet(nn.Module):
         self.up3 = Up(56, 32, self.bilinear, dilation=True)
         self.outc = OutConv(32, self.n_classes)
 
+    def _build_modified_architecture(self):
+        """Modified (SlimUNet) architecture with stride-based downsampling"""
+        # Initial layer with stride-2 convolution (reduces size by 2x immediately)
+        self.initial = nn.Conv2d(1, 24, kernel_size=3, stride=2, padding=1, bias=True)
+        
+        # Encoder path using stride-based downsampling
+        self.enc1 = ModifiedDown(24, 32)
+        self.enc2 = ModifiedDown(32, 40)
+        self.enc3 = ModifiedDown(40, 48)
+        
+        # Decoder path with explicit channel management
+        self.dec1 = ModifiedUp(up_in_channels=48, skip_channels=40, out_channels=40)
+        self.dec2 = ModifiedUp(up_in_channels=40, skip_channels=32, out_channels=32)
+        self.dec3 = ModifiedUp(up_in_channels=32, skip_channels=24, out_channels=24)
+        
+        # Output layer
+        self.outc = OutConv(24, self.n_classes)
+
     def forward(self, x):
         if hasattr(self, 'config'):
             return self._forward_dynamic(x)
         elif self.architecture == "standard":
             return self._forward_standard(x)
-        else:
+        elif self.architecture == "lightweight":
             return self._forward_lightweight(x)
+        elif self.architecture == "modified":
+            return self._forward_modified(x)
 
     def _forward_dynamic(self, x):
         """Dynamic forward pass based on configuration"""
@@ -310,6 +368,32 @@ class UNet(nn.Module):
         logits = self.outc(x)
         
         # Ensure output matches input size
+        if logits.shape[-2:] != input_size:
+            logits = F.interpolate(logits, size=input_size, mode='bilinear', align_corners=False)
+        
+        return logits
+
+    def _forward_modified(self, x):
+        """Modified (SlimUNet) forward pass"""
+        input_size = x.shape[-2:]  # Store original input size
+        
+        # Initial convolution with stride-2 (reduces size by 2x)
+        x0 = self.initial(x)
+        
+        # Encoder path
+        x1 = self.enc1(x0)
+        x2 = self.enc2(x1)
+        x3 = self.enc3(x2)
+        
+        # Decoder path with skip connections
+        x = self.dec1(x3, x2)
+        x = self.dec2(x, x1)
+        x = self.dec3(x, x0)
+        
+        # Output convolution
+        logits = self.outc(x)
+        
+        # Dynamically resize back to original input size
         if logits.shape[-2:] != input_size:
             logits = F.interpolate(logits, size=input_size, mode='bilinear', align_corners=False)
         

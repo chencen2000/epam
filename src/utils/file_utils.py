@@ -138,13 +138,13 @@ def _process_mask(mask: np.ndarray, mask_type: str, multiclass_requested: bool,
         # Multi-class mask processing
         if multiclass_requested:
             # Return as-is if already multi-class and multi-class requested
-            if np.max(unique_values) <= 2:
+            if np.max(unique_values) <= 4:
                 logger.debug("Multi-class mask already in correct format")
                 return mask.astype(np.uint8)
             else:
                 # Clip to valid range if values are too high
-                logger.warning(f"Multi-class mask has values > 2: {unique_values}, clipping to [0,1,2]")
-                return np.clip(mask, 0, 2).astype(np.uint8)
+                logger.warning(f"Multi-class mask has values > 2: {unique_values}, clipping to [0,1,2, 3]")
+                return np.clip(mask, 0, 4).astype(np.uint8)
         else:
             # Convert multi-class to binary (combine all defect classes)
             logger.debug("Converting multi-class mask to binary")

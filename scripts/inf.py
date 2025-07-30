@@ -64,7 +64,7 @@ def main():
     """Enhanced main function with config-based inference"""
     parser = argparse.ArgumentParser(description='Enhanced Dirt Detection Model Inference with Config Support')
     parser.add_argument('--config', type=str, 
-                       default='config/inference/full_phone_batch_predictor.yaml',
+                       default='config/inference/mask_predictor.yaml',
                        help='Path to the configuration YAML file')
     
     args = parser.parse_args()
@@ -315,7 +315,39 @@ def main():
 
     elif not new_images and batch_mode:
         # run with mask in batch mode
-        pass 
+        # Run batch ground truth comparison on dataset samples
+        app_logger.info("Running batch multi-class inference with ground truth comparison...")
+        try:
+            # Validate setup
+            if not validate_multiclass_setup(single_predictor, app_logger):
+                app_logger.warning("Multi-class setup validation failed, but continuing...")
+            
+            # Use existing functions through batch wrapper
+            results = single_predictor.batch_predict_and_compare_mask(
+                
+                dataset_dir=str(input_path),
+                output_dir=str(output_path),
+                max_samples=max_samples,
+                # logger=app_logger
+            )
+            
+            # Log batch comparison results summary
+            if results:
+                total_samples = len(results)
+                successful_samples = len([r for r in results if r.get('status') == 'completed'])
+                multiclass_samples = len([r for r in results if r.get('sample_type') == 'multiclass'])
+                binary_samples = len([r for r in results if r.get('sample_type') == 'binary'])
+                
+                app_logger.info(f"Batch ground truth comparison completed!")
+                app_logger.info(f"Processed {total_samples} samples total")
+                app_logger.info(f"  Successful: {successful_samples}")
+                app_logger.info(f"  Multi-class samples: {multiclass_samples}")
+                app_logger.info(f"  Binary samples: {binary_samples}")
+                app_logger.info(f"Results saved to: {output_path}")
+            
+        except Exception as e:
+            app_logger.error(f"Error during batch ground truth comparison: {e}")
+            sys.exit(1) 
 
 
 if __name__ == "__main__":

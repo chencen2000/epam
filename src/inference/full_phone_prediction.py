@@ -9,10 +9,10 @@ from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 
+from src.target_labels import TargetLabels
 from src.core.logger_config import setup_application_logger
 from src.inference.single_predictor import SingleImagePredictor
 from src.synthesis.patch_generator import PatchGenerator
-from src.inference.base_predictor import BasePredictor
 from src.synthesis.boundary_detector import BoundaryDetector
 
 
@@ -715,7 +715,9 @@ class FullScreenPredictor:
         fig = plt.figure(figsize=(24, 16))
         
         # Create a complex subplot layout
-        gs = fig.add_gridspec(4, 5, height_ratios=[2, 2, 2, 1], width_ratios=[1, 1, 1, 1, 1])
+        gs = fig.add_gridspec(4, 5, height_ratios=[2, 2, 2, 1], width_ratios=[1, 1, 1, 1, 1], hspace=0.2)
+
+        # ================== ROW 1 =============================
         
         # Row 1: Basic images and class predictions
         # Full phone image with detected boundary
@@ -744,19 +746,26 @@ class FullScreenPredictor:
             results['aggregated_prediction']['class_prediction']
         )
         ax3.imshow(class_pred_colored)
-        ax3.set_title('Multi-Class Prediction\n(Black=BG, Green=Scratches, Red=Dirt)', 
+        ax3.set_title('Multi-Class Prediction\n(Black=BG, Green=Condensation, \nRed=Dirt, Blue=Scratch)', 
                      fontsize=12, fontweight='bold')
         ax3.axis('off')
         
         # Combined defect probability
         ax4 = fig.add_subplot(gs[0, 3])
-        dirt_prob = results['aggregated_prediction']['class_probabilities']['dirt']
-        scratch_prob = results['aggregated_prediction']['class_probabilities']['scratches']
-        combined_prob = np.maximum(dirt_prob, scratch_prob)
+        # dirt_prob = results['aggregated_prediction']['class_probabilities']['dirt']
+        # scratch_prob = results['aggregated_prediction']['class_probabilities']['scratches']
+        # combined_prob = np.maximum(dirt_prob, scratch_prob)
+        probs = [results['aggregated_prediction']['class_probabilities'][label.value] 
+                for label in TargetLabels]
+        combined_prob = np.maximum.reduce(probs)
         prob_display = ax4.imshow(combined_prob, cmap='hot', vmin=0, vmax=1)
-        ax4.set_title('Max Defect Probability\n(Dirt or Scratches)', fontsize=12, fontweight='bold')
+        ax4.set_title(
+            'Max Defect Probability\n(Condensation or Dirt \nor Scratches)',
+            fontsize=12, 
+            fontweight='bold'
+        )
         ax4.axis('off')
-        plt.colorbar(prob_display, ax=ax4, fraction=0.046, pad=0.04)
+        plt.colorbar(prob_display, ax=ax4,)
         
         # Screen with multi-class overlay
         ax5 = fig.add_subplot(gs[0, 4])
@@ -766,34 +775,46 @@ class FullScreenPredictor:
         ax5.imshow(overlay_screen)
         ax5.set_title('Screen Multi-Class Overlay', fontsize=12, fontweight='bold')
         ax5.axis('off')
+
+        # ================== ROW 2 =============================
+
+        # def create
         
         # Row 2: Individual class visualizations
         # Dirt probability map
         ax6 = fig.add_subplot(gs[1, 0])
-        dirt_display = ax6.imshow(dirt_prob, cmap='Greens', vmin=0, vmax=1)
-        ax6.set_title(f'Scratches Probability\n({results["aggregated_prediction"]["class_statistics"]["dirt_percentage"]:.1f}%)', 
-                     fontsize=12, fontweight='bold')
+        dirt_prob = probs[TargetLabels.get_by_value("dirt").index]
+        dirt_display = ax6.imshow(dirt_prob, cmap='Reds', vmin=0, vmax=1)
+        ax6.set_title(
+            f'Dirt Probability\n({results["aggregated_prediction"]["class_statistics"]["dirt_percentage"]:.1f}%)', 
+            fontsize=12, 
+            fontweight='bold'
+        )
         ax6.axis('off')
-        plt.colorbar(dirt_display, ax=ax6, fraction=0.046, pad=0.04)
+        plt.colorbar(dirt_display, ax=ax6,)
+
+        # Dirt binary mask
+        ax8 = fig.add_subplot(gs[1, 1])
+        ax8.imshow(results['aggregated_prediction']['binary_masks']['dirt'], cmap='Reds', vmin=0, vmax=1)
+        ax8.set_title('Dirt Binary Mask', fontsize=12, fontweight='bold')
+        ax8.axis('off')
         
         # Scratches probability map
-        ax7 = fig.add_subplot(gs[1, 1])
-        scratch_display = ax7.imshow(scratch_prob, cmap='Reds', vmin=0, vmax=1)
-        ax7.set_title(f'Dirt Probability\n({results["aggregated_prediction"]["class_statistics"]["scratches_percentage"]:.1f}%)', 
-                     fontsize=12, fontweight='bold')
+        ax7 = fig.add_subplot(gs[1, 2])
+        scratch_prob = probs[TargetLabels.get_by_value("scratch").index]
+        scratch_display = ax7.imshow(scratch_prob, cmap='Blues', vmin=0, vmax=1)
+        ax7.set_title(
+            f'Scratch Probability\n({results["aggregated_prediction"]["class_statistics"]["scratch_percentage"]:.1f}%)', 
+            fontsize=12,
+            fontweight='bold'
+        )
         ax7.axis('off')
-        plt.colorbar(scratch_display, ax=ax7, fraction=0.046, pad=0.04)
-        
-        # Dirt binary mask
-        ax8 = fig.add_subplot(gs[1, 2])
-        ax8.imshow(results['aggregated_prediction']['binary_masks']['dirt'], cmap='Greens', vmin=0, vmax=1)
-        ax8.set_title('Scratches Binary Mask', fontsize=12, fontweight='bold')
-        ax8.axis('off')
+        plt.colorbar(scratch_display, ax=ax7, )
         
         # Scratches binary mask
         ax9 = fig.add_subplot(gs[1, 3])
-        ax9.imshow(results['aggregated_prediction']['binary_masks']['scratches'], cmap='Reds', vmin=0, vmax=1)
-        ax9.set_title('Dirt Binary Mask', fontsize=12, fontweight='bold')
+        ax9.imshow(results['aggregated_prediction']['binary_masks']['scratch'], cmap='Blues', vmin=0, vmax=1)
+        ax9.set_title('Scratch Binary Mask', fontsize=12, fontweight='bold')
         ax9.axis('off')
         
         # Patch coverage visualization
@@ -802,17 +823,39 @@ class FullScreenPredictor:
         ax10.set_title(f'Patch Coverage\n(Max: {int(np.max(results["aggregated_prediction"]["coverage_count"]))} overlaps)', 
                       fontsize=12, fontweight='bold')
         ax10.axis('off')
-        plt.colorbar(coverage_display, ax=ax10, fraction=0.046, pad=0.04)
+        plt.colorbar(coverage_display, ax=ax10, )
+
+        # ================== ROW 3 =============================
+
+        # Condensation probability map
+        ax17 = fig.add_subplot(gs[2, 0])
+        condensation_prob = probs[TargetLabels.get_by_value("condensation").index]
+        scratch_display = ax17.imshow(condensation_prob, cmap='Greens', vmin=0, vmax=1)
+        ax17.set_title(
+            f'Condensation Probability\n({results["aggregated_prediction"]["class_statistics"]["condensation_percentage"]:.1f}%)', 
+            fontsize=12,
+            fontweight='bold'
+        )
+        ax17.axis('off')
+        plt.colorbar(scratch_display, ax=ax17, )
+        
+        # Scratches binary mask
+        ax18 = fig.add_subplot(gs[2, 1])
+        ax18.imshow(results['aggregated_prediction']['binary_masks']['condensation'], cmap='Greens', vmin=0, vmax=1)
+        ax18.set_title('Condensation Binary Mask', fontsize=12, fontweight='bold')
+        ax18.axis('off')
         
         # Row 3: Analysis and statistics
+
+
         # Patch statistics visualization
-        ax11 = fig.add_subplot(gs[2, 0])
+        ax11 = fig.add_subplot(gs[2, 2])
         patch_results = results['patch_analysis']['patch_results']
         valid_patches = [p for p in patch_results if 'error' not in p]
         
         if valid_patches and 'class_statistics' in valid_patches[0]:
             dirt_percentages = [p['class_statistics'].get('dirt_percentage', 0) for p in valid_patches]
-            scratch_percentages = [p['class_statistics'].get('scratches_percentage', 0) for p in valid_patches]
+            scratch_percentages = [p['class_statistics'].get('scratch_percentage', 0) for p in valid_patches]
             
             ax11.hist([dirt_percentages, scratch_percentages], bins=15, alpha=0.7, 
                      label=['Dirt', 'Scratches'], color=['green', 'red'])
@@ -827,7 +870,7 @@ class FullScreenPredictor:
             ax11.set_title('Patch Statistics', fontsize=12, fontweight='bold')
         
         # Class distribution pie chart
-        ax12 = fig.add_subplot(gs[2, 1])
+        ax12 = fig.add_subplot(gs[2, 3])
         class_stats = results['aggregated_prediction']['class_statistics']
         class_percentages = [
             class_stats.get('background_percentage', 0),
@@ -848,9 +891,18 @@ class FullScreenPredictor:
                     autopct='%1.1f%%', startangle=90)
         
         ax12.set_title('Screen Class Distribution', fontsize=12, fontweight='bold')
+
+        # Full phone with multi-class overlay
+        ax15 = fig.add_subplot(gs[2, 4])
+        full_with_overlay = self._create_full_phone_dirt_overlay(full_image, results)
+        ax15.imshow(full_with_overlay)
+        ax15.set_title('Full Phone Multi-Class Overlay', fontsize=12, fontweight='bold')
+        ax15.axis('off')
+
+        # ================== ROW 4 =============================
         
         # Region analysis visualization
-        ax13 = fig.add_subplot(gs[2, 2])
+        ax13 = fig.add_subplot(gs[3, 0])
         region_analysis = results['overall_statistics']['region_analysis']
         
         region_text = "REGION ANALYSIS:\n\n"
@@ -872,11 +924,11 @@ class FullScreenPredictor:
         ax13.text(0.05, 0.95, region_text, transform=ax13.transAxes,
                  verticalalignment='top', fontsize=10, fontfamily='monospace',
                  bbox=dict(boxstyle='round', facecolor='lightcyan', alpha=0.8))
-        ax13.set_title('Region Analysis', fontsize=12, fontweight='bold')
+        ax13.set_title('Region Analysis', fontsize=12, fontweight='bold', loc='left')
         ax13.axis('off')
         
         # Performance metrics
-        ax14 = fig.add_subplot(gs[2, 3])
+        ax14 = fig.add_subplot(gs[3, 1])
         perf_stats = results['overall_statistics']['performance_metrics']
         
         perf_text = f"""PERFORMANCE METRICS:
@@ -895,18 +947,13 @@ CLASSES: {results['model_info']['num_classes']}"""
         ax14.text(0.05, 0.95, perf_text, transform=ax14.transAxes,
                  verticalalignment='top', fontsize=10, fontfamily='monospace',
                  bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.8))
-        ax14.set_title('Performance Metrics', fontsize=12, fontweight='bold')
+        ax14.set_title('Performance Metrics', fontsize=12, fontweight='bold', loc='left')
         ax14.axis('off')
         
-        # Full phone with multi-class overlay
-        ax15 = fig.add_subplot(gs[2, 4])
-        full_with_overlay = self._create_full_phone_dirt_overlay(full_image, results)
-        ax15.imshow(full_with_overlay)
-        ax15.set_title('Full Phone Multi-Class Overlay', fontsize=12, fontweight='bold')
-        ax15.axis('off')
+        
         
         # Bottom row: Comprehensive summary
-        ax16 = fig.add_subplot(gs[3, :])
+        ax16 = fig.add_subplot(gs[3, 2:])
         stats = results['overall_statistics']
         
         summary_text = f"""MULTI-CLASS FULL PHONE DIRT DETECTION ANALYSIS - {results['image_info']['filename']}
