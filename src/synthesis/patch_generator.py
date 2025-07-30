@@ -128,7 +128,8 @@ class PatchGenerator:
                     'bounds': (min_x, min_y, max_x, max_y),
                     'segmentation': ann['segmentation'],
                     'category_id': ann['category_id'],
-                    'original_area': ann.get('area', 0)
+                    'original_area': ann.get('area', 0),
+                    "category_name": ann.get("category_name", "unknown"),
                 })
                 
             except (KeyError, IndexError, ValueError):
@@ -185,7 +186,8 @@ class PatchGenerator:
                     "bbox": [adj_bbox_x, adj_bbox_y, adj_bbox_w, adj_bbox_h],
                     "segmentation": adj_seg_polys,
                     "category_id": ann_info['category_id'],
-                    "area": new_area
+                    "area": new_area,
+                    "category_name": ann_info["category_name"]
                 })
         
         return adjusted_annotations
