@@ -25,6 +25,10 @@ class SingleImagePredictor(BasePredictor):
         self.region_analyzer = region_analyzer
         self.image_operations = image_operations
         self.num_classes = self.config.get('num_classes', 3)
+        self.multiclass_gt_metrics = {
+            "iou_metrics" : [],
+            "dice_metrics": []
+        }
 
         if app_logger is None:
             app_logger = setup_application_logger()
@@ -720,9 +724,8 @@ Class Distribution:"""
             # Calculate and display metrics
             if len(np.unique(ground_truth)) > 2:
                 # Multi-class metrics
-                metrics_text, iou_metrics, dice_metrics = self._calculate_multiclass_metrics_text(prediction_result['class_prediction'], np.squeeze(ground_truth))
-                prediction_result["iou_metrics"] = iou_metrics
-                prediction_result["dice_metrics"] = dice_metrics
+                metrics_text= self._calculate_multiclass_metrics_text(prediction_result['class_prediction'], np.squeeze(ground_truth))
+                
             else:
                 # Binary metrics for dirt class
                 dirt_pred = (prediction_result['class_prediction'] == 1).astype(np.uint8)
@@ -764,7 +767,7 @@ CLASS STATISTICS:"""
             if show_plot:
                 plt.show()
             
-            return fig, prediction_result
+            return fig
             
         except Exception as e:
             self.logger.error(f"Failed to create multi-class comparison visualization: {e}")
@@ -798,15 +801,15 @@ CLASS STATISTICS:"""
                     metrics_text += f"  IoU: {iou_metrics[iou_key]:.3f}\n"
                     metrics_text += f"  Dice: {dice_metrics[dice_key]:.3f}\n"
             
-            return metrics_text, iou_metrics, dice_metrics
+            return metrics_text
             
         except Exception as e:
             self.logger.warning(f"Failed to calculate multi-class metrics: {e}")
             return "METRICS: Calculation failed"
 
-
-    def batch_predict_and_compare_mask(self,  dataset_dir: str, output_dir: str = None, 
-                                   max_samples: int = None,):
+    def batch_predict_and_compare_mask(self, dataset_dir: str, output_dir: str = None, 
+                                     max_samples: int = None) -> List[Dict]:
+        """Efficient batch processing with essential metrics only"""
         dataset_path = Path(dataset_dir)
         if not dataset_path.exists():
             raise FileNotFoundError(f"Dataset directory not found: {dataset_dir}")
@@ -816,7 +819,7 @@ CLASS STATISTICS:"""
         else:
             output_dir = Path(output_dir)
 
-         # Find dataset sample directories
+        # Find dataset sample directories
         required_files_multi = ['synthetic_dirty_patch.png', 'segmentation_mask_patch_multiclass.png', 'labels_patch.json']
         fallback_files_binary = ['synthetic_dirty_patch.png', 'segmentation_mask_patch.png', 'labels_patch.json']
         
@@ -824,9 +827,9 @@ CLASS STATISTICS:"""
         for item in dataset_path.iterdir():
             if item.is_dir():
                 if all((item / file).exists() for file in required_files_multi):
-                    sample_dirs.append((item, 'multiclass'))
+                    sample_dirs.append(item)
                 elif all((item / file).exists() for file in fallback_files_binary):
-                    sample_dirs.append((item, 'binary'))
+                    sample_dirs.append(item)
                     
         if max_samples:
             sample_dirs = sample_dirs[:max_samples]
@@ -834,108 +837,119 @@ CLASS STATISTICS:"""
 
         results = []
         from tqdm import tqdm
-        for i, (sample_dir, sample_type) in enumerate(tqdm(sample_dirs, desc="Processing dataset samples")):
+        
+        for i, sample_dir in enumerate(tqdm(sample_dirs, desc="Processing samples")):
             try:
-                self.logger.debug(f"\nProcessing {i+1}/{len(sample_dirs)}: {sample_dir.name} ({sample_type})")
-                
                 # Create sample-specific output directory
                 sample_output_dir = output_dir / sample_dir.name
                 sample_output_dir.mkdir(exist_ok=True)
                 
-                # Use existing predict_and_compare_mask function
-                iou_metrics, dice_metrics = self.predict_and_compare_mask(str(sample_dir), str(sample_output_dir))
-                
-                # Create result entry
-                result = {
-                    'sample_name': sample_dir.name,
-                    'sample_type': sample_type,
-                    'sample_path': str(sample_dir),
-                    'output_path': str(sample_output_dir),
-                    "iou_metrics": iou_metrics,
-                    "dice_metrics": dice_metrics,
-                    'status': 'completed'
-                }
+                # Process sample efficiently
+                result = self.predict_and_compare_mask(str(sample_dir), str(sample_output_dir))
                 results.append(result)
                 
             except Exception as e:
                 self.logger.error(f"Error processing {sample_dir.name}: {e}")
-                result = {
+                results.append({
                     'sample_name': sample_dir.name,
-                    'sample_type': 'unknown',
-                    'sample_path': str(sample_dir),
-                    'output_path': str(output_dir / sample_dir.name),
-                    "iou_metrics": np.nan,
-                    "dice_metrics": np.nanprod,
                     'status': 'error',
                     'error': str(e)
-                }
-                results.append(result)
-                continue
-        # Save batch summary using existing pattern
+                })
+                
+        # Save streamlined summary
         if results:
-            summary_path = output_dir / "batch_comparison_summary.json"
-            self._save_batch_comparison_summary(results, str(summary_path), self.logger)
+            summary_path = output_dir / "batch_summary.json"
+            self._save_efficient_batch_summary(results, str(summary_path))
             
-            successful_count = len([r for r in results if r.get('status') == 'completed'])
-            error_count = len([r for r in results if r.get('status') == 'error'])
-            multiclass_count = len([r for r in results if r.get('sample_type') == 'multiclass'])
-            binary_count = len([r for r in results if r.get('sample_type') == 'binary'])
+            successful = [r for r in results if r.get('status') == 'completed']
+            multiclass = [r for r in successful if r.get('sample_type') == 'multiclass']
+            binary = [r for r in successful if r.get('sample_type') == 'binary']
             
-            self.logger.info(f"\nBatch ground truth comparison completed!")
-            self.logger.info(f"Total samples: {len(results)}")
-            self.logger.info(f"Successful: {successful_count}, Errors: {error_count}")
-            self.logger.info(f"Multi-class: {multiclass_count}, Binary: {binary_count}")
-            self.logger.info(f"Results saved to: {output_dir}")
+            self.logger.info(f"\nBatch completed! Processed {len(successful)}/{len(results)} samples")
+            self.logger.info(f"Multi-class: {len(multiclass)}, Binary: {len(binary)}")
+            
+            # Log only key aggregate metrics
+            if multiclass:
+                avg_iou = np.mean([r['metrics']['mean_iou'] for r in multiclass if 'metrics' in r])
+                self.logger.info(f"Multi-class avg IoU: {avg_iou:.3f}")
+            
+            if binary:
+                avg_iou = np.mean([r['metrics']['iou'] for r in binary if 'metrics' in r])
+                self.logger.info(f"Binary avg IoU: {avg_iou:.3f}")
         
         return results
-    
-    def _save_batch_comparison_summary(self, results: List[Dict], save_path: str, logger):
-        """Save batch comparison summary - reuses existing JSON pattern"""
+
+    def _save_efficient_batch_summary(self, results: List[Dict], save_path: str):
+        """Save streamlined batch summary focusing on key metrics"""
         import json
+        import time
         
-        successful_results = [r for r in results if r.get('status') == 'completed']
-        error_results = [r for r in results if r.get('status') == 'error']
-        multiclass_results = [r for r in successful_results if r.get('sample_type') == 'multiclass']
-        binary_results = [r for r in successful_results if r.get('sample_type') == 'binary']
+        successful = [r for r in results if r.get('status') == 'completed']
+        multiclass = [r for r in successful if r.get('sample_type') == 'multiclass']
+        binary = [r for r in successful if r.get('sample_type') == 'binary']
         
+        # Calculate only essential aggregates
+        multiclass_summary = {}
+        if multiclass:
+            iou_values = [r['metrics']['mean_iou'] for r in multiclass if 'metrics' in r and 'mean_iou' in r['metrics']]
+            dice_values = [r['metrics']['mean_dice'] for r in multiclass if 'metrics' in r and 'mean_dice' in r['metrics']]
+            
+            if iou_values:
+                multiclass_summary = {
+                    'count': len(multiclass),
+                    'avg_iou': float(np.mean(iou_values)),
+                    'avg_dice': float(np.mean(dice_values)) if dice_values else 0.0,
+                    'std_iou': float(np.std(iou_values)),
+                    'min_iou': float(np.min(iou_values)),
+                    'max_iou': float(np.max(iou_values))
+                }
+
+        binary_summary = {}
+        if binary:
+            iou_values = [r['metrics']['iou'] for r in binary if 'metrics' in r and 'iou' in r['metrics']]
+            precision_values = [r['metrics']['precision'] for r in binary if 'metrics' in r and 'precision' in r['metrics']]
+            
+            if iou_values:
+                binary_summary = {
+                    'count': len(binary),
+                    'avg_iou': float(np.mean(iou_values)),
+                    'avg_precision': float(np.mean(precision_values)) if precision_values else 0.0,
+                    'std_iou': float(np.std(iou_values)),
+                    'min_iou': float(np.min(iou_values)),
+                    'max_iou': float(np.max(iou_values))
+                }
+
         summary = {
             'batch_info': {
                 'total_samples': len(results),
-                'successful_samples': len(successful_results),
-                'error_samples': len(error_results),
-                'multiclass_samples': len(multiclass_results),
-                'binary_samples': len(binary_results),
-                'processing_type': 'ground_truth_comparison'
+                'successful_samples': len(successful),
+                'multiclass_samples': len(multiclass),
+                'binary_samples': len(binary),
+                'processing_date': time.strftime('%Y-%m-%d %H:%M:%S')
             },
-            'model_info': {
-                'num_classes': self.num_classes,
-                'class_names': self.class_names,
-                'architecture': self.config.get('model_architecture', 'standard'),
+            'aggregate_metrics': {
+                'multiclass': multiclass_summary,
+                'binary': binary_summary
             },
-            'successful_samples': [
+            'individual_results': [
                 {
                     'sample_name': r['sample_name'],
-                    'sample_type': r['sample_type'],
-                    'sample_path': r['sample_path'],
-                    'output_path': r['output_path']
-                } for r in successful_results
-            ],
-            'error_samples': [
-                {
-                    'sample_name': r['sample_name'],
-                    'sample_path': r['sample_path'],
-                    'error': r.get('error', 'Unknown error')
-                } for r in error_results
+                    'sample_type': r.get('sample_type', 'unknown'),
+                    'status': r['status'],
+                    'metrics': r.get('metrics', {}),
+                    'inference_time': r.get('inference_time', 0),
+                    'error': r.get('error')
+                } for r in results
             ]
         }
         
         with open(save_path, 'w') as f:
-            json.dump(summary, f, indent=2)
+            json.dump(summary, f, indent=2, default=str)
         
-        logger.info(f"Batch comparison summary saved to: {save_path}")
-
-    def predict_and_compare_mask(self, input_path: str, output_dir: str):
-        """Updated for multi-class dataset comparison"""
+        self.logger.info(f"Efficient batch summary saved to: {save_path}")
+    
+    def predict_and_compare_mask(self, input_path: str, output_dir: str) -> Dict:
+        """Streamlined version for multi-class dataset comparison"""
         input_path = Path(input_path)
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -949,57 +963,157 @@ CLASS STATISTICS:"""
             self.logger.info(f"Running multi-class inference on dataset sample: {input_path}")
             try:
                 image, ground_truth, labels = load_ground_truth_data(str(input_path), self.logger, multiclass=True)
-                prediction_result = self.predict(image, target_size=(1792, 1792), return_raw=True)
-                
-                # Save multi-class comparison visualization
+                prediction_result = self.predict(image, target_size=(1792, 1792), return_raw=False)  # Don't return raw for speed
+
+                # Save visualization
                 output_path = output_dir / f"{input_path.name}_multiclass_inference.png"
-                _, prediction_result = self.visualize_multiclass_comparison(
+                self.visualize_multiclass_comparison(
                     image, prediction_result, ground_truth, labels,
                     save_path=str(output_path), show_plot=False
                 )
                 
-                # # Calculate and display multi-class metrics
-                # self._print_multiclass_comparison_metrics(prediction_result, ground_truth)
+                # Calculate ONLY essential metrics efficiently
+                metrics = self._calculate_essential_metrics(prediction_result['class_prediction'], ground_truth)
                 
-                self.logger.info(f"Multi-class inference completed!")
-                self.logger.info(f"Results saved to: {output_path}")
+                self.logger.info(f"Multi-class inference completed! IoU: {metrics.get('mean_iou', 0):.3f}")
 
-                return prediction_result["iou_metrics"], prediction_result["dice_metrics"]
+                return {
+                    'sample_name': input_path.name,
+                    'sample_type': 'multiclass',
+                    'status': 'completed',
+                    'metrics': metrics,
+                    'inference_time': prediction_result['inference_time']
+                }
                 
             except Exception as e:
-                self.logger.error(f"Error processing multi-class dataset sample: {e}")
+                self.logger.error(f"Error processing {input_path.name}: {e}")
+                return {
+                    'sample_name': input_path.name,
+                    'sample_type': 'multiclass',
+                    'status': 'error',
+                    'error': str(e)
+                }
                 
         elif all((input_path / file).exists() for file in fallback_files):
-            # Binary dataset sample - treat as legacy
-            self.logger.info(f"Running inference on binary dataset sample (legacy mode): {input_path}")
+            # Binary dataset sample
+            self.logger.info(f"Running inference on binary dataset sample: {input_path}")
             try:
                 image, ground_truth, labels = load_ground_truth_data(str(input_path), self.logger, multiclass=False)
-                prediction_result = self.predict(image)
+                prediction_result = self.predict(image, return_raw=False)  # Don't return raw for speed
                 
-                # Save visualization with ground truth comparison
+                # Save visualization
                 output_path = output_dir / f"{input_path.name}_inference.png"
                 self.visualize_multiclass_comparison(
                     image, prediction_result, ground_truth, labels,
                     save_path=str(output_path), show_plot=False
                 )
                 
-                # Calculate metrics comparing dirt class to binary ground truth
+                # Calculate essential binary metrics only
                 dirt_pred = (prediction_result['class_prediction'] == 1).astype(np.uint8)
-                metrics = calculate_metrics(dirt_pred, ground_truth)
+                metrics = self._calculate_essential_binary_metrics(dirt_pred, ground_truth)
                 
-                self.logger.info(f"Inference completed!")
-                self.logger.info(f"Metrics (Dirt class vs Binary GT):")
-                self.logger.info(f"  Pixel IoU: {metrics.get('pixel_iou', 0):.3f}")
-                self.logger.info(f"  Pixel Dice: {metrics.get('pixel_dice', 0):.3f}")
-                self.logger.info(f"Results saved to: {output_path}")
+                self.logger.info(f"Binary inference completed! IoU: {metrics.get('iou', 0):.3f}")
+                
+                return {
+                    'sample_name': input_path.name,
+                    'sample_type': 'binary',
+                    'status': 'completed',
+                    'metrics': metrics,
+                    'inference_time': prediction_result['inference_time']
+                }
                 
             except Exception as e:
-                self.logger.error(f"Error processing binary dataset sample: {e}")
+                self.logger.error(f"Error processing {input_path.name}: {e}")
+                return {
+                    'sample_name': input_path.name,
+                    'sample_type': 'binary',
+                    'status': 'error',
+                    'error': str(e)
+                }
         else:
-            self.logger.warning("Directory does not contain required dataset files.")
-            self.logger.warning("Required for multi-class: synthetic_dirty_patch.png, segmentation_mask_patch_multiclass.png, labels_patch.json")
-            self.logger.warning("Required for binary: synthetic_dirty_patch.png, segmentation_mask_patch.png, labels_patch.json")
+            return {
+                'sample_name': input_path.name,
+                'sample_type': 'unknown',
+                'status': 'error',
+                'error': 'Missing required files'
+            }
 
+    def _calculate_essential_metrics(self, prediction: np.ndarray, ground_truth: np.ndarray) -> Dict:
+        """Calculate only essential metrics efficiently"""
+        try:
+            # Flatten for efficiency
+            pred_flat = prediction.flatten()
+            gt_flat = ground_truth.flatten()
+            
+            # Calculate per-class IoU and Dice efficiently
+            metrics = {}
+            ious = []
+            dices = []
+            
+            for cls in range(self.num_classes):
+                pred_cls = (pred_flat == cls)
+                true_cls = (gt_flat == cls)
+                
+                intersection = np.sum(pred_cls & true_cls)
+                union = np.sum(pred_cls | true_cls)
+                pred_sum = np.sum(pred_cls)
+                true_sum = np.sum(true_cls)
+                
+                # IoU
+                iou = intersection / union if union > 0 else 1.0
+                # Dice  
+                dice = (2 * intersection) / (pred_sum + true_sum) if (pred_sum + true_sum) > 0 else 1.0
+                
+                class_name = self.class_names[cls]
+                metrics[f'{class_name}_iou'] = float(iou)
+                metrics[f'{class_name}_dice'] = float(dice)
+                
+                ious.append(iou)
+                dices.append(dice)
+            
+            # Mean metrics
+            metrics['mean_iou'] = float(np.mean(ious))
+            metrics['mean_dice'] = float(np.mean(dices))
+            
+            return metrics
+            
+        except Exception as e:
+            self.logger.error(f"Failed to calculate essential metrics: {e}")
+            return {'error': str(e)}
+
+    def _calculate_essential_binary_metrics(self, prediction: np.ndarray, ground_truth: np.ndarray) -> Dict:
+        """Calculate essential binary metrics efficiently"""
+        try:
+            # Flatten for efficiency
+            pred_flat = prediction.flatten()
+            gt_flat = ground_truth.flatten()
+            
+            # Calculate basic confusion matrix
+            tp = np.sum((pred_flat == 1) & (gt_flat == 1))
+            fp = np.sum((pred_flat == 1) & (gt_flat == 0))
+            fn = np.sum((pred_flat == 0) & (gt_flat == 1))
+            
+            # Essential metrics only
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+            recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+            iou = tp / (tp + fp + fn) if (tp + fp + fn) > 0 else 0.0
+            dice = (2 * tp) / (2 * tp + fp + fn) if (2 * tp + fp + fn) > 0 else 0.0
+            
+            return {
+                'iou': float(iou),
+                'dice': float(dice),
+                'precision': float(precision),
+                'recall': float(recall),
+                'tp': int(tp),
+                'fp': int(fp),
+                'fn': int(fn)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Failed to calculate binary metrics: {e}")
+            return {'error': str(e)}
+    
+    
     def _print_multiclass_comparison_metrics(self, prediction_result: Dict, ground_truth: np.ndarray):
         """Print detailed multi-class comparison metrics"""
         try:
@@ -1025,4 +1139,5 @@ CLASS STATISTICS:"""
                 
         except Exception as e:
             self.logger.error(f"Failed to calculate detailed metrics: {e}")
+            e.with_traceback()
 
