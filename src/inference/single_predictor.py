@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from torch import no_grad, softmax
 import matplotlib.patches as mpatches
 
-from src.models.unet import UNet
+from src.target_labels import TargetLabels
 from src.core.region_analyzer import RegionAnalyzer
 from src.inference.base_predictor import BasePredictor
 from src.synthesis.image_operations import ImageOperations
@@ -25,6 +25,10 @@ class SingleImagePredictor(BasePredictor):
         self.region_analyzer = region_analyzer
         self.image_operations = image_operations
         self.num_classes = self.config.get('num_classes', 3)
+        self.multiclass_gt_metrics = {
+            "iou_metrics" : [],
+            "dice_metrics": []
+        }
 
         if app_logger is None:
             app_logger = setup_application_logger()
@@ -57,7 +61,7 @@ class SingleImagePredictor(BasePredictor):
             logits = self.model(image_tensor)
             inference_time = time.time() - start_time
 
-            self.logger.info(f"Model inference time = {inference_time}")
+            # self.logger.info(f"Model inference time = {inference_time}")
             
             # FIXED: Use softmax for multi-class instead of sigmoid
             probabilities = softmax(logits, dim=1).cpu().numpy()[0]  # Shape: (num_classes, H, W)
@@ -415,30 +419,37 @@ Class Distribution:"""
         colored = np.zeros((h, w, 3), dtype=np.uint8)
         
         # Apply colors for each class
-        for cls in range(self.num_classes):
-            mask = class_prediction == cls
-            if cls == 0:  # Background - black
+        for num_class in range(self.num_classes):
+            mask = class_prediction == num_class
+            if num_class == 0:  # Background - black
                 colored[mask] = [0, 0, 0]
-            elif cls == 1:  # Dirt - green
+            elif num_class == 1:  # condensation - green
                 colored[mask] = [0, 255, 0]
-            elif cls == 2:  # Scratches - red
+            elif num_class == 2:  # dirt - red
                 colored[mask] = [255, 0, 0]
+            elif num_class == 3:  # scratch - blue
+                colored[mask] = [0, 0, 255]
         
         return colored
 
     def create_multiclass_overlay(self, image: np.ndarray, class_prediction: np.ndarray) -> np.ndarray:
         """Create overlay of multi-class prediction on original image"""
         overlay = image.copy()
+
+        # condensation overlay (green)
+        condensation_mask = class_prediction == 1
+        if np.any(condensation_mask):
+            overlay[condensation_mask] = overlay[condensation_mask] * 0.3 + np.array([0, 255, 0]) * 0.7
         
-        # Dirt overlay (green)
-        dirt_mask = class_prediction == 1
+        # Dirt overlay (red)
+        dirt_mask = class_prediction == 2
         if np.any(dirt_mask):
-            overlay[dirt_mask] = overlay[dirt_mask] * 0.3 + np.array([0, 255, 0]) * 0.7
+            overlay[dirt_mask] = overlay[dirt_mask] * 0.3 + np.array([255, 0, 0]) * 0.7
         
-        # Scratches overlay (red)
-        scratch_mask = class_prediction == 2
+        # Scratches overlay (blue)
+        scratch_mask = class_prediction == 3
         if np.any(scratch_mask):
-            overlay[scratch_mask] = overlay[scratch_mask] * 0.3 + np.array([255, 0, 0]) * 0.7
+            overlay[scratch_mask] = overlay[scratch_mask] * 0.3 + np.array([0, 0, 255]) * 0.7
         
         return overlay.astype(np.uint8)
 
@@ -610,7 +621,7 @@ Class Distribution:"""
         Create comparison visualization for multi-class predictions with ground truth
         """
         try:
-            fig, axes = plt.subplots(2, 4, figsize=(20, 10))
+            fig, axes = plt.subplots(2, 5, figsize=(20, 10))
             
             # Original image
             axes[0, 0].imshow(image)
@@ -620,13 +631,13 @@ Class Distribution:"""
             # Multi-class prediction
             class_pred_colored = self.create_multiclass_visualization(prediction_result['class_prediction'])
             axes[0, 1].imshow(class_pred_colored)
-            axes[0, 1].set_title('Multi-Class Prediction\n(Black=BG, Green=Scratches, Red=Dirt)', 
+            axes[0, 1].set_title('Multi-Class Prediction\n(Black=BG, Green=Condensation, \nRed=Dirt, Blue=Scratch)', 
                                fontsize=12, fontweight='bold')
             axes[0, 1].axis('off')
             
             # Ground truth (assuming it's multi-class too)
             if len(np.unique(ground_truth)) > 2:  # Multi-class ground truth
-                gt_colored = self.create_multiclass_visualization(ground_truth)
+                gt_colored = self.create_multiclass_visualization(np.squeeze(ground_truth))
                 axes[0, 2].imshow(gt_colored)
                 axes[0, 2].set_title('Ground Truth\n(Multi-Class)', fontsize=12, fontweight='bold')
             else:  # Binary ground truth - treat as dirt class
@@ -635,46 +646,86 @@ Class Distribution:"""
                 axes[0, 2].imshow(gt_display)
                 axes[0, 2].set_title('Ground Truth\n(Binary - Dirt)', fontsize=12, fontweight='bold')
             axes[0, 2].axis('off')
+
+            # Class-wise probability visualization
+            # Show dirt and scratch probabilities combined
+            # dirt_prob = prediction_result['class_probabilities']['dirt']
+            # scratch_prob = prediction_result['class_probabilities']['scratch']
+            # combined_prob = np.maximum(dirt_prob, scratch_prob)
+            probs = [prediction_result['class_probabilities'][label.value] 
+                    for label in TargetLabels]
+            combined_prob = np.maximum.reduce(probs)
+            
+            prob_display = axes[0, 3].imshow(combined_prob, cmap='hot', vmin=0, vmax=1)
+            axes[0, 3].set_title('Max Defect Probability\n(All dirt category)', fontsize=12, fontweight='bold')
+            axes[0, 3].axis('off')
+            plt.colorbar(prob_display, ax=axes[0, 3], fraction=0.046, pad=0.04)
             
             # Comparison visualization
             if len(np.unique(ground_truth)) > 2:
-                comparison = self.create_multiclass_comparison_mask(prediction_result['class_prediction'], ground_truth)
+                comparison = self.create_multiclass_comparison_mask(prediction_result['class_prediction'], np.squeeze(ground_truth))
             else:
                 # For binary GT, compare with dirt class prediction
                 dirt_pred = (prediction_result['class_prediction'] == 1).astype(np.uint8)
                 comparison = self.create_comparison_mask(dirt_pred, ground_truth)
             
-            axes[0, 3].imshow(comparison)
-            axes[0, 3].set_title('Prediction vs Ground Truth\n(Yellow=Error)', fontsize=12, fontweight='bold')
-            axes[0, 3].axis('off')
-            
+            axes[0, 4].imshow(comparison)
+            axes[0, 4].set_title('Prediction vs Ground Truth\n(Yellow=Error)', fontsize=12, fontweight='bold')
+            axes[0, 4].axis('off')
+
             # Bottom row - overlays and metrics
+
             # Prediction overlay
             overlay = self.create_multiclass_overlay(image, prediction_result['class_prediction'])
             axes[1, 0].imshow(overlay)
             axes[1, 0].set_title('Prediction Overlay', fontsize=12, fontweight='bold')
             axes[1, 0].axis('off')
-            
-            # Class-wise probability visualization
-            # Show dirt and scratch probabilities combined
-            dirt_prob = prediction_result['class_probabilities']['dirt']
-            scratch_prob = prediction_result['class_probabilities']['scratches']
-            combined_prob = np.maximum(dirt_prob, scratch_prob)
-            
-            prob_display = axes[1, 1].imshow(combined_prob, cmap='hot', vmin=0, vmax=1)
-            axes[1, 1].set_title('Max Defect Probability\n(Dirt or Scratches)', fontsize=12, fontweight='bold')
+
+            # dirt prob
+            dirt_prob = probs[TargetLabels.get_by_value("dirt").index]
+            dirt_display = axes[1, 1].imshow(dirt_prob, cmap='Reds', vmin=0, vmax=1)
+            axes[1, 1].set_title(
+                f'Dirt Probability\n({prediction_result["class_statistics"]["dirt_percentage"]:.1f}%)', 
+                fontsize=12, 
+                fontweight='bold'
+            )
             axes[1, 1].axis('off')
-            plt.colorbar(prob_display, ax=axes[1, 1], fraction=0.046, pad=0.04)
-            
-            # Error visualization
-            axes[1, 2].imshow(comparison)
-            axes[1, 2].set_title('Error Analysis\n(Yellow=Misclassified)', fontsize=12, fontweight='bold')
+            plt.colorbar(dirt_display, ax=axes[1, 1], fraction=0.046, pad=0.04)
+
+            # scratch prob
+            dirt_prob = probs[TargetLabels.get_by_value("scratch").index]
+            dirt_display = axes[1, 2].imshow(dirt_prob, cmap='Blues', vmin=0, vmax=1)
+            axes[1, 2].set_title(
+                f'Scratch Probability\n({prediction_result["class_statistics"]["scratch_percentage"]:.1f}%)', 
+                fontsize=12, 
+                fontweight='bold'
+            )
             axes[1, 2].axis('off')
+            plt.colorbar(dirt_display, ax=axes[1, 2], fraction=0.046, pad=0.04)
+
+
+            # Condensation prob
+            dirt_prob = probs[TargetLabels.get_by_value("condensation").index]
+            dirt_display = axes[1, 3].imshow(dirt_prob, cmap='Greens', vmin=0, vmax=1)
+            axes[1, 3].set_title(
+                f'Condensation Probability\n({prediction_result["class_statistics"]["condensation_percentage"]:.1f}%)', 
+                fontsize=12, 
+                fontweight='bold'
+            )
+            axes[1, 3].axis('off')
+            plt.colorbar(dirt_display, ax=axes[1, 3], fraction=0.046, pad=0.04)
+
+                        
+            # # Error visualization
+            # axes[1, 2].imshow(comparison)
+            # axes[1, 2].set_title('Error Analysis\n(Yellow=Misclassified)', fontsize=12, fontweight='bold')
+            # axes[1, 2].axis('off')
             
             # Calculate and display metrics
             if len(np.unique(ground_truth)) > 2:
                 # Multi-class metrics
-                metrics_text = self._calculate_multiclass_metrics_text(prediction_result['class_prediction'], ground_truth)
+                metrics_text= self._calculate_multiclass_metrics_text(prediction_result['class_prediction'], np.squeeze(ground_truth))
+                
             else:
                 # Binary metrics for dirt class
                 dirt_pred = (prediction_result['class_prediction'] == 1).astype(np.uint8)
@@ -694,18 +745,18 @@ CLASS STATISTICS:"""
                 
                 metrics_text += f"\n\nInference: {prediction_result['inference_time']:.3f}s"
             
-            axes[1, 3].text(0.05, 0.95, metrics_text, transform=axes[1, 3].transAxes,
+            axes[1, 4].text(0.05, 0.95, metrics_text, transform=axes[1, 4].transAxes,
                            verticalalignment='top', fontsize=10, fontfamily='monospace',
                            bbox=dict(boxstyle='round', facecolor='lightgray', alpha=0.8))
-            axes[1, 3].set_title('Performance Metrics', fontsize=12, fontweight='bold')
-            axes[1, 3].axis('off')
+            axes[1, 4].set_title('Performance Metrics', fontsize=12, fontweight='bold', loc="left")
+            axes[1, 4].axis('off')
             
             # Add main title
             if labels:
                 title = f"Multi-Class Comparison - {labels.get('source_image', 'Unknown')}"
             else:
                 title = "Multi-Class Dirt Detection Comparison"
-            fig.suptitle(title, fontsize=16, fontweight='bold')
+            fig.suptitle(title, fontsize=16, fontweight='bold',)
             
             plt.tight_layout()
             
@@ -727,8 +778,9 @@ CLASS STATISTICS:"""
         try:
             # Convert to torch tensors for metric calculation
             import torch
-            pred_tensor = torch.from_numpy(prediction).unsqueeze(0).unsqueeze(0)  # Add batch and channel dims
-            gt_tensor = torch.from_numpy(ground_truth).unsqueeze(0)
+            # FIXED: prediction is already class indices (H, W), not logits
+            pred_tensor = torch.from_numpy(prediction).unsqueeze(0)  # Add batch dim: (1, H, W)
+            gt_tensor = torch.from_numpy(ground_truth).unsqueeze(0)   # Add batch dim: (1, H, W)
             
             # Calculate multi-class IoU and Dice
             iou_metrics = calculate_multiclass_iou(pred_tensor, gt_tensor, self.num_classes)
@@ -755,8 +807,149 @@ CLASS STATISTICS:"""
             self.logger.warning(f"Failed to calculate multi-class metrics: {e}")
             return "METRICS: Calculation failed"
 
-    def predict_and_compare_mask(self, input_path: str, output_dir: str):
-        """Updated for multi-class dataset comparison"""
+    def batch_predict_and_compare_mask(self, dataset_dir: str, output_dir: str = None, 
+                                     max_samples: int = None) -> List[Dict]:
+        """Efficient batch processing with essential metrics only"""
+        dataset_path = Path(dataset_dir)
+        if not dataset_path.exists():
+            raise FileNotFoundError(f"Dataset directory not found: {dataset_dir}")
+        
+        if output_dir is None:
+            output_dir = dataset_path / 'batch_comparison_results'
+        else:
+            output_dir = Path(output_dir)
+
+        # Find dataset sample directories
+        required_files_multi = ['synthetic_dirty_patch.png', 'segmentation_mask_patch_multiclass.png', 'labels_patch.json']
+        fallback_files_binary = ['synthetic_dirty_patch.png', 'segmentation_mask_patch.png', 'labels_patch.json']
+        
+        sample_dirs = []
+        for item in dataset_path.iterdir():
+            if item.is_dir():
+                if all((item / file).exists() for file in required_files_multi):
+                    sample_dirs.append(item)
+                elif all((item / file).exists() for file in fallback_files_binary):
+                    sample_dirs.append(item)
+                    
+        if max_samples:
+            sample_dirs = sample_dirs[:max_samples]
+        self.logger.info(f"Found {len(sample_dirs)} dataset samples for batch comparison")
+
+        results = []
+        from tqdm import tqdm
+        
+        for i, sample_dir in enumerate(tqdm(sample_dirs, desc="Processing samples")):
+            try:
+                # Create sample-specific output directory
+                sample_output_dir = output_dir / sample_dir.name
+                sample_output_dir.mkdir(exist_ok=True)
+                
+                # Process sample efficiently
+                result = self.predict_and_compare_mask(str(sample_dir), str(sample_output_dir))
+                results.append(result)
+                
+            except Exception as e:
+                self.logger.error(f"Error processing {sample_dir.name}: {e}")
+                results.append({
+                    'sample_name': sample_dir.name,
+                    'status': 'error',
+                    'error': str(e)
+                })
+                
+        # Save streamlined summary
+        if results:
+            summary_path = output_dir / "batch_summary.json"
+            self._save_efficient_batch_summary(results, str(summary_path))
+            
+            successful = [r for r in results if r.get('status') == 'completed']
+            multiclass = [r for r in successful if r.get('sample_type') == 'multiclass']
+            binary = [r for r in successful if r.get('sample_type') == 'binary']
+            
+            self.logger.info(f"\nBatch completed! Processed {len(successful)}/{len(results)} samples")
+            self.logger.info(f"Multi-class: {len(multiclass)}, Binary: {len(binary)}")
+            
+            # Log only key aggregate metrics
+            if multiclass:
+                avg_iou = np.mean([r['metrics']['mean_iou'] for r in multiclass if 'metrics' in r])
+                self.logger.info(f"Multi-class avg IoU: {avg_iou:.3f}")
+            
+            if binary:
+                avg_iou = np.mean([r['metrics']['iou'] for r in binary if 'metrics' in r])
+                self.logger.info(f"Binary avg IoU: {avg_iou:.3f}")
+        
+        return results
+
+    def _save_efficient_batch_summary(self, results: List[Dict], save_path: str):
+        """Save streamlined batch summary focusing on key metrics"""
+        import json
+        import time
+        
+        successful = [r for r in results if r.get('status') == 'completed']
+        multiclass = [r for r in successful if r.get('sample_type') == 'multiclass']
+        binary = [r for r in successful if r.get('sample_type') == 'binary']
+        
+        # Calculate only essential aggregates
+        multiclass_summary = {}
+        if multiclass:
+            iou_values = [r['metrics']['mean_iou'] for r in multiclass if 'metrics' in r and 'mean_iou' in r['metrics']]
+            dice_values = [r['metrics']['mean_dice'] for r in multiclass if 'metrics' in r and 'mean_dice' in r['metrics']]
+            
+            if iou_values:
+                multiclass_summary = {
+                    'count': len(multiclass),
+                    'avg_iou': float(np.mean(iou_values)),
+                    'avg_dice': float(np.mean(dice_values)) if dice_values else 0.0,
+                    'std_iou': float(np.std(iou_values)),
+                    'min_iou': float(np.min(iou_values)),
+                    'max_iou': float(np.max(iou_values))
+                }
+
+        binary_summary = {}
+        if binary:
+            iou_values = [r['metrics']['iou'] for r in binary if 'metrics' in r and 'iou' in r['metrics']]
+            precision_values = [r['metrics']['precision'] for r in binary if 'metrics' in r and 'precision' in r['metrics']]
+            
+            if iou_values:
+                binary_summary = {
+                    'count': len(binary),
+                    'avg_iou': float(np.mean(iou_values)),
+                    'avg_precision': float(np.mean(precision_values)) if precision_values else 0.0,
+                    'std_iou': float(np.std(iou_values)),
+                    'min_iou': float(np.min(iou_values)),
+                    'max_iou': float(np.max(iou_values))
+                }
+
+        summary = {
+            'batch_info': {
+                'total_samples': len(results),
+                'successful_samples': len(successful),
+                'multiclass_samples': len(multiclass),
+                'binary_samples': len(binary),
+                'processing_date': time.strftime('%Y-%m-%d %H:%M:%S')
+            },
+            'aggregate_metrics': {
+                'multiclass': multiclass_summary,
+                'binary': binary_summary
+            },
+            'individual_results': [
+                {
+                    'sample_name': r['sample_name'],
+                    'sample_type': r.get('sample_type', 'unknown'),
+                    'status': r['status'],
+                    'metrics': r.get('metrics', {}),
+                    'inference_time': r.get('inference_time', 0),
+                    'error': r.get('error')
+                } for r in results
+            ]
+        }
+        
+        with open(save_path, 'w') as f:
+            json.dump(summary, f, indent=2, default=str)
+        
+        self.logger.info(f"Efficient batch summary saved to: {save_path}")
+    
+    def predict_and_compare_mask(self, input_path: str, output_dir: str) -> Dict:
+        """Streamlined version for multi-class dataset comparison"""
         input_path = Path(input_path)
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -767,71 +960,174 @@ CLASS STATISTICS:"""
 
         if all((input_path / file).exists() for file in required_files):
             # Multi-class dataset sample
-            print(f"Running multi-class inference on dataset sample: {input_path}")
+            self.logger.info(f"Running multi-class inference on dataset sample: {input_path}")
             try:
                 image, ground_truth, labels = load_ground_truth_data(str(input_path), self.logger, multiclass=True)
-                prediction_result = self.predict(image)
-                
-                # Save multi-class comparison visualization
+                prediction_result = self.predict(image, target_size=(1792, 1792), return_raw=False)  # Don't return raw for speed
+
+                # Save visualization
                 output_path = output_dir / f"{input_path.name}_multiclass_inference.png"
                 self.visualize_multiclass_comparison(
                     image, prediction_result, ground_truth, labels,
                     save_path=str(output_path), show_plot=False
                 )
                 
-                # Calculate and display multi-class metrics
-                self._print_multiclass_comparison_metrics(prediction_result, ground_truth)
+                # Calculate ONLY essential metrics efficiently
+                metrics = self._calculate_essential_metrics(prediction_result['class_prediction'], ground_truth)
                 
-                print(f"Multi-class inference completed!")
-                print(f"Results saved to: {output_path}")
+                self.logger.info(f"Multi-class inference completed! IoU: {metrics.get('mean_iou', 0):.3f}")
+
+                return {
+                    'sample_name': input_path.name,
+                    'sample_type': 'multiclass',
+                    'status': 'completed',
+                    'metrics': metrics,
+                    'inference_time': prediction_result['inference_time']
+                }
                 
             except Exception as e:
-                print(f"Error processing multi-class dataset sample: {e}")
+                self.logger.error(f"Error processing {input_path.name}: {e}")
+                return {
+                    'sample_name': input_path.name,
+                    'sample_type': 'multiclass',
+                    'status': 'error',
+                    'error': str(e)
+                }
                 
         elif all((input_path / file).exists() for file in fallback_files):
-            # Binary dataset sample - treat as legacy
-            print(f"Running inference on binary dataset sample (legacy mode): {input_path}")
+            # Binary dataset sample
+            self.logger.info(f"Running inference on binary dataset sample: {input_path}")
             try:
                 image, ground_truth, labels = load_ground_truth_data(str(input_path), self.logger, multiclass=False)
-                prediction_result = self.predict(image)
+                prediction_result = self.predict(image, return_raw=False)  # Don't return raw for speed
                 
-                # Save visualization with ground truth comparison
+                # Save visualization
                 output_path = output_dir / f"{input_path.name}_inference.png"
                 self.visualize_multiclass_comparison(
                     image, prediction_result, ground_truth, labels,
                     save_path=str(output_path), show_plot=False
                 )
                 
-                # Calculate metrics comparing dirt class to binary ground truth
+                # Calculate essential binary metrics only
                 dirt_pred = (prediction_result['class_prediction'] == 1).astype(np.uint8)
-                metrics = calculate_metrics(dirt_pred, ground_truth)
+                metrics = self._calculate_essential_binary_metrics(dirt_pred, ground_truth)
                 
-                print(f"Inference completed!")
-                print(f"Metrics (Dirt class vs Binary GT):")
-                print(f"  Pixel IoU: {metrics.get('pixel_iou', 0):.3f}")
-                print(f"  Pixel Dice: {metrics.get('pixel_dice', 0):.3f}")
-                print(f"Results saved to: {output_path}")
+                self.logger.info(f"Binary inference completed! IoU: {metrics.get('iou', 0):.3f}")
+                
+                return {
+                    'sample_name': input_path.name,
+                    'sample_type': 'binary',
+                    'status': 'completed',
+                    'metrics': metrics,
+                    'inference_time': prediction_result['inference_time']
+                }
                 
             except Exception as e:
-                print(f"Error processing binary dataset sample: {e}")
+                self.logger.error(f"Error processing {input_path.name}: {e}")
+                return {
+                    'sample_name': input_path.name,
+                    'sample_type': 'binary',
+                    'status': 'error',
+                    'error': str(e)
+                }
         else:
-            print("Directory does not contain required dataset files.")
-            print("Required for multi-class: synthetic_dirty_patch.png, segmentation_mask_patch_multiclass.png, labels_patch.json")
-            print("Required for binary: synthetic_dirty_patch.png, segmentation_mask_patch.png, labels_patch.json")
+            return {
+                'sample_name': input_path.name,
+                'sample_type': 'unknown',
+                'status': 'error',
+                'error': 'Missing required files'
+            }
 
+    def _calculate_essential_metrics(self, prediction: np.ndarray, ground_truth: np.ndarray) -> Dict:
+        """Calculate only essential metrics efficiently"""
+        try:
+            # Flatten for efficiency
+            pred_flat = prediction.flatten()
+            gt_flat = ground_truth.flatten()
+            
+            # Calculate per-class IoU and Dice efficiently
+            metrics = {}
+            ious = []
+            dices = []
+            
+            for cls in range(self.num_classes):
+                pred_cls = (pred_flat == cls)
+                true_cls = (gt_flat == cls)
+                
+                intersection = np.sum(pred_cls & true_cls)
+                union = np.sum(pred_cls | true_cls)
+                pred_sum = np.sum(pred_cls)
+                true_sum = np.sum(true_cls)
+                
+                # IoU
+                iou = intersection / union if union > 0 else 1.0
+                # Dice  
+                dice = (2 * intersection) / (pred_sum + true_sum) if (pred_sum + true_sum) > 0 else 1.0
+                
+                class_name = self.class_names[cls]
+                metrics[f'{class_name}_iou'] = float(iou)
+                metrics[f'{class_name}_dice'] = float(dice)
+                
+                ious.append(iou)
+                dices.append(dice)
+            
+            # Mean metrics
+            metrics['mean_iou'] = float(np.mean(ious))
+            metrics['mean_dice'] = float(np.mean(dices))
+            
+            return metrics
+            
+        except Exception as e:
+            self.logger.error(f"Failed to calculate essential metrics: {e}")
+            return {'error': str(e)}
+
+    def _calculate_essential_binary_metrics(self, prediction: np.ndarray, ground_truth: np.ndarray) -> Dict:
+        """Calculate essential binary metrics efficiently"""
+        try:
+            # Flatten for efficiency
+            pred_flat = prediction.flatten()
+            gt_flat = ground_truth.flatten()
+            
+            # Calculate basic confusion matrix
+            tp = np.sum((pred_flat == 1) & (gt_flat == 1))
+            fp = np.sum((pred_flat == 1) & (gt_flat == 0))
+            fn = np.sum((pred_flat == 0) & (gt_flat == 1))
+            
+            # Essential metrics only
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+            recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+            iou = tp / (tp + fp + fn) if (tp + fp + fn) > 0 else 0.0
+            dice = (2 * tp) / (2 * tp + fp + fn) if (2 * tp + fp + fn) > 0 else 0.0
+            
+            return {
+                'iou': float(iou),
+                'dice': float(dice),
+                'precision': float(precision),
+                'recall': float(recall),
+                'tp': int(tp),
+                'fp': int(fp),
+                'fn': int(fn)
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Failed to calculate binary metrics: {e}")
+            return {'error': str(e)}
+    
+    
     def _print_multiclass_comparison_metrics(self, prediction_result: Dict, ground_truth: np.ndarray):
         """Print detailed multi-class comparison metrics"""
         try:
             import torch
-            pred_tensor = torch.from_numpy(prediction_result['class_prediction']).unsqueeze(0).unsqueeze(0)
-            gt_tensor = torch.from_numpy(ground_truth).unsqueeze(0)
+            # FIXED: Remove the extra .unsqueeze(0) - class_prediction is already class indices (H, W)
+            pred_tensor = torch.from_numpy(prediction_result['class_prediction']).unsqueeze(0)  # Add batch dim only: (1, H, W)
+            gt_tensor = torch.from_numpy(ground_truth).unsqueeze(0)  # Add batch dim only: (1, H, W)
             
             iou_metrics = calculate_multiclass_iou(pred_tensor, gt_tensor, self.num_classes)
             dice_metrics = calculate_multiclass_dice(pred_tensor, gt_tensor, self.num_classes)
             
-            print(f"\nMulti-Class Metrics:")
-            print(f"  Mean IoU: {iou_metrics.get('mean_iou', 0):.3f}")
-            print(f"  Mean Dice: {dice_metrics.get('mean_dice', 0):.3f}")
+            self.logger.info(f"\nMulti-Class Metrics:")
+            self.logger.info(f"  Mean IoU: {iou_metrics.get('mean_iou', 0):.3f}")
+            self.logger.info(f"  Mean Dice: {dice_metrics.get('mean_dice', 0):.3f}")
             
             for cls in range(self.num_classes):
                 class_name = self.class_names[cls]
@@ -839,11 +1135,9 @@ CLASS STATISTICS:"""
                 dice_val = dice_metrics.get(f'dice_class_{cls}', 0)
                 class_pct = prediction_result['class_statistics'][f'{class_name}_percentage']
                 
-                print(f"  {class_name.title()}: IoU={iou_val:.3f}, Dice={dice_val:.3f}, Coverage={class_pct:.2f}%")
+                self.logger.info(f"  {class_name.title()}: IoU={iou_val:.3f}, Dice={dice_val:.3f}, Coverage={class_pct:.2f}%")
                 
         except Exception as e:
-            print(f"Failed to calculate detailed metrics: {e}")
+            self.logger.error(f"Failed to calculate detailed metrics: {e}")
+            e.with_traceback()
 
-    def batch_predict_and_compare_mask(self):
-        """Placeholder for batch comparison - to be implemented"""
-        pass

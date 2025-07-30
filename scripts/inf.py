@@ -82,7 +82,7 @@ def main():
         sys.exit(1)
     
     # Setup logger
-    log_file = config.get('logging', {}).get('file', 'logs/inference1.log')
+    log_file = config.get('logging', {}).get('file', 'logs/inference3.log')
     app_logger = setup_application_logger(
         app_name="predictor", 
         log_file_name=log_file
@@ -176,7 +176,8 @@ def main():
     input_path = Path(input_path)
 
 
-    if full_phone_enabled and batch_mode:
+    if full_phone_enabled and new_images and batch_mode:
+        # Batch processing of new full phone images (no ground truth)
 
         # Batch processing of full phone images
         app_logger.info("Running batch multi-class inference on full phone images...")
@@ -214,7 +215,8 @@ def main():
             app_logger.error(f"Error during multi-class batch full phone inference: {e}")
             sys.exit(1)
 
-    elif full_phone_enabled and not batch_mode:
+    elif full_phone_enabled and new_images and not batch_mode:
+        # Single new full phone image (no ground truth)
 
          # Single full phone image
         app_logger.info(f"Running multi-class full phone inference on: {input_path}")
@@ -248,6 +250,64 @@ def main():
             app_logger.error(f"Error during multi-class full phone inference: {e}")
             sys.exit(1)
     
+    elif full_phone_enabled and not new_images and batch_mode:
+        # NEW: Batch full phone images with ground truth
+        app_logger.info("Running batch full phone inference with ground truth comparison...")
+        try:
+            if not validate_multiclass_setup(single_predictor, app_logger):
+                app_logger.warning("Multi-class setup validation failed, but continuing...")
+            
+            results = full_ph_predictor.batch_full_phone_prediction_with_ground_truth(
+                dataset_dir=str(input_path),
+                patch_size=patch_size,
+                overlap=overlap,
+                output_dir=str(output_path),
+                max_samples=max_samples,
+                min_dirt_threshold=min_dirt_threshold
+            )
+            
+            if results:
+                successful = [r for r in results if r.get('batch_info', {}).get('status') == 'completed']
+                app_logger.info(f"Batch full phone GT completed! {len(successful)}/{len(results)} successful")
+                
+                if successful:
+                    avg_iou = np.mean([r['ground_truth_comparison']['metrics']['mean_iou'] 
+                                     for r in successful if 'ground_truth_comparison' in r])
+                    avg_dice = np.mean([r['ground_truth_comparison']['metrics']['mean_dice'] 
+                                      for r in successful if 'ground_truth_comparison' in r])
+                    app_logger.info(f"Average GT IoU: {avg_iou:.3f}, Average GT Dice: {avg_dice:.3f}")
+            
+        except Exception as e:
+            app_logger.error(f"Error during batch full phone GT comparison: {e}")
+            sys.exit(1)
+    
+    elif full_phone_enabled and not new_images and not batch_mode:
+        # NEW: Single full phone image with ground truth
+        app_logger.info(f"Running full phone inference with ground truth: {input_path}")
+        try:
+            if not validate_multiclass_setup(single_predictor, app_logger):
+                app_logger.warning("Multi-class setup validation failed, but continuing...")
+            
+            result = full_ph_predictor.full_phone_prediction_with_ground_truth(
+                image_path=str(input_path),
+                patch_size=patch_size,
+                overlap=overlap,
+                save_results=True,
+                output_dir=str(output_path),
+                show_plot=False,
+                min_dirt_threshold=min_dirt_threshold
+            )
+            
+            if result and 'ground_truth_comparison' in result:
+                gt_metrics = result['ground_truth_comparison']['metrics']
+                app_logger.info("Full phone GT inference completed!")
+                app_logger.info(f"Mean IoU: {gt_metrics.get('mean_iou', 0):.3f}")
+                app_logger.info(f"Mean Dice: {gt_metrics.get('mean_dice', 0):.3f}")
+            
+        except Exception as e:
+            app_logger.error(f"Error during full phone GT inference: {e}")
+            sys.exit(1)
+
     elif new_images and batch_mode:
         # Batch processing of full phone images
         app_logger.info("Running batch inference on new images (patches)...")
@@ -314,8 +374,45 @@ def main():
             sys.exit(1)
 
     elif not new_images and batch_mode:
-        # run with mask in batch mode
-        pass 
+        # EFFICIENT: Run batch ground truth comparison with streamlined metrics
+        app_logger.info("Running batch multi-class inference with ground truth comparison...")
+        try:
+            # Validate setup
+            if not validate_multiclass_setup(single_predictor, app_logger):
+                app_logger.warning("Multi-class setup validation failed, but continuing...")
+            
+            # Use efficient batch comparison
+            results = single_predictor.batch_predict_and_compare_mask(
+                dataset_dir=str(input_path),
+                output_dir=str(output_path),
+                max_samples=max_samples,
+            )
+            
+            # Streamlined logging - only key metrics
+            if results:
+                successful = [r for r in results if r.get('status') == 'completed']
+                multiclass = [r for r in successful if r.get('sample_type') == 'multiclass']
+                binary = [r for r in successful if r.get('sample_type') == 'binary']
+                
+                app_logger.info(f"Batch completed! {len(successful)}/{len(results)} successful")
+                app_logger.info(f"Multi-class: {len(multiclass)}, Binary: {len(binary)}")
+                
+                # Log only essential aggregate metrics
+                if multiclass:
+                    iou_values = [r['metrics']['mean_iou'] for r in multiclass if 'metrics' in r]
+                    if iou_values:
+                        app_logger.info(f"Multi-class avg IoU: {np.mean(iou_values):.3f} (±{np.std(iou_values):.3f})")
+                
+                if binary:
+                    iou_values = [r['metrics']['iou'] for r in binary if 'metrics' in r]
+                    if iou_values:
+                        app_logger.info(f"Binary avg IoU: {np.mean(iou_values):.3f} (±{np.std(iou_values):.3f})")
+                
+                app_logger.info(f"Results saved to: {output_path}")
+            
+        except Exception as e:
+            app_logger.error(f"Error during batch ground truth comparison: {e}")
+            sys.exit(1)
 
 
 if __name__ == "__main__":

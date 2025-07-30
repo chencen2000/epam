@@ -493,7 +493,7 @@ class SyntheticDataGenerator:
                 self.logger.debug(f"    -> Using source: {random_dirty_image}")
 
                 results = self.image_processor.process_dirt_mask_extraction(
-                    random_dirty_image, self.bg_estimation_filter_size
+                    random_dirty_image, self.bg_estimation_filter_size, resize_factor=True
                 )
 
                 if results["low_threshold_mask"] is None or results["high_threshold_mask"] is None:
@@ -885,7 +885,6 @@ class SyntheticDataGenerator:
             clean_images = clean_images[:max_images]
 
         for i, image_name in tqdm(enumerate(clean_images), desc="total images processed: ", total=len(clean_images)):
-            
             self.logger.debug(f"=== Processing {image_name} ===")
 
             resized_img, (x, y, w, h) = self.preprocess_image_synthesis(image_name)

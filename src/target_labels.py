@@ -6,8 +6,8 @@ class TargetLabels(Enum):
     # Format: (value, index, weight)
     BACKGROUND = ("background", 0, 0.01)
     CONDENSATION = ("condensation", 1, 0.3)
-    DIRT = ("dirt", 2, 0.6)
-    SCRATCH = ("scratch", 3, 0.1)
+    DIRT = ("dirt", 2, 0.3)
+    SCRATCH = ("scratch", 3, 0.3)
 
     def __init__(self, value: str, index: int, weight: float):
         self.label = value
@@ -79,6 +79,10 @@ class TargetLabels(Enum):
     def value_to_weight_map(cls) -> Dict[str, float]:
         """Get mapping of value to weight"""
         return {item.value: item.weight for item in cls}
+
+    @classmethod
+    def get_dataset_mapping(cls):
+        return {item.value:{"id": item.index, "name": item.value} for item in cls}
 
 
 # Example Usage

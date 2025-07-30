@@ -11,6 +11,7 @@ from torch import load
 from ultralytics import YOLO
 
 from src.models.unet import UNet
+from src.target_labels import TargetLabels
 from src.core.device_utils import get_device_info
 from src.core.logger_config import setup_application_logger
 
@@ -47,7 +48,8 @@ class BasePredictor(ABC):
         }
         
         # Class names for multi-class
-        self.class_names = ['background',  'scratches', 'dirt',]
+        # self.class_names = ['background',  'scratches', 'dirt',]
+        self.class_names = TargetLabels.values()
         
         self.load_model(model_path)
         self._load_suction_cup_model()
@@ -80,7 +82,7 @@ class BasePredictor(ABC):
             bilinear=True,
             architecture=self.architecture,
             app_logger=self.logger,
-            config_path="config/models/light_weight.yaml"
+            config_path=None
         ).to(self.device)
         
         self.model.load_state_dict(checkpoint['model_state_dict'])
@@ -182,7 +184,7 @@ class BasePredictor(ABC):
 
         classify_time = time.time()
         # Classify & print result
-        classify_result = self.classify(left_outside_region) or self.classify(left_inside_region) or self.classify(right_outside_region) or classify(right_inside_region)
+        classify_result = self.classify(left_outside_region) or self.classify(left_inside_region) or self.classify(right_outside_region) or self.classify(right_inside_region)
         end_time = time.time()
 
         if classify_result:
@@ -195,7 +197,7 @@ class BasePredictor(ABC):
         self.logger.info(f'Bbox detection time = {bbox_detection_time}ms, PowerON classification time = {power_on_classify_time}ms')
         
         resized_rgb = cv2.resize(rgb_image, None, fx=0.2, fy=0.2) # downscale log image to save space           
-        cv2.imwrite(f'{folder_path}/{image_name}_power_on_classification.png', resized_rgb) # write log image
+        cv2.imwrite(f'{folder_path}/{image_name}_power_on_classification{"_POWER_ON_DETECTED" if classify_result else ""}.png', resized_rgb) # write log image
 
     @abstractmethod
     def predict(self, image: ndarray, return_raw: bool = False) -> Dict:

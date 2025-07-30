@@ -9,10 +9,10 @@ from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 
+from src.target_labels import TargetLabels
 from src.core.logger_config import setup_application_logger
 from src.inference.single_predictor import SingleImagePredictor
 from src.synthesis.patch_generator import PatchGenerator
-from src.inference.base_predictor import BasePredictor
 from src.synthesis.boundary_detector import BoundaryDetector
 
 
@@ -715,7 +715,9 @@ class FullScreenPredictor:
         fig = plt.figure(figsize=(24, 16))
         
         # Create a complex subplot layout
-        gs = fig.add_gridspec(4, 5, height_ratios=[2, 2, 2, 1], width_ratios=[1, 1, 1, 1, 1])
+        gs = fig.add_gridspec(4, 5, height_ratios=[2, 2, 2, 1], width_ratios=[1, 1, 1, 1, 1], hspace=0.2)
+
+        # ================== ROW 1 =============================
         
         # Row 1: Basic images and class predictions
         # Full phone image with detected boundary
@@ -744,19 +746,26 @@ class FullScreenPredictor:
             results['aggregated_prediction']['class_prediction']
         )
         ax3.imshow(class_pred_colored)
-        ax3.set_title('Multi-Class Prediction\n(Black=BG, Green=Scratches, Red=Dirt)', 
+        ax3.set_title('Multi-Class Prediction\n(Black=BG, Green=Condensation, \nRed=Dirt, Blue=Scratch)', 
                      fontsize=12, fontweight='bold')
         ax3.axis('off')
         
         # Combined defect probability
         ax4 = fig.add_subplot(gs[0, 3])
-        dirt_prob = results['aggregated_prediction']['class_probabilities']['dirt']
-        scratch_prob = results['aggregated_prediction']['class_probabilities']['scratches']
-        combined_prob = np.maximum(dirt_prob, scratch_prob)
+        # dirt_prob = results['aggregated_prediction']['class_probabilities']['dirt']
+        # scratch_prob = results['aggregated_prediction']['class_probabilities']['scratches']
+        # combined_prob = np.maximum(dirt_prob, scratch_prob)
+        probs = [results['aggregated_prediction']['class_probabilities'][label.value] 
+                for label in TargetLabels]
+        combined_prob = np.maximum.reduce(probs)
         prob_display = ax4.imshow(combined_prob, cmap='hot', vmin=0, vmax=1)
-        ax4.set_title('Max Defect Probability\n(Dirt or Scratches)', fontsize=12, fontweight='bold')
+        ax4.set_title(
+            'Max Defect Probability\n(Condensation or Dirt \nor Scratches)',
+            fontsize=12, 
+            fontweight='bold'
+        )
         ax4.axis('off')
-        plt.colorbar(prob_display, ax=ax4, fraction=0.046, pad=0.04)
+        plt.colorbar(prob_display, ax=ax4,)
         
         # Screen with multi-class overlay
         ax5 = fig.add_subplot(gs[0, 4])
@@ -766,34 +775,46 @@ class FullScreenPredictor:
         ax5.imshow(overlay_screen)
         ax5.set_title('Screen Multi-Class Overlay', fontsize=12, fontweight='bold')
         ax5.axis('off')
+
+        # ================== ROW 2 =============================
+
+        # def create
         
         # Row 2: Individual class visualizations
         # Dirt probability map
         ax6 = fig.add_subplot(gs[1, 0])
-        dirt_display = ax6.imshow(dirt_prob, cmap='Greens', vmin=0, vmax=1)
-        ax6.set_title(f'Scratches Probability\n({results["aggregated_prediction"]["class_statistics"]["dirt_percentage"]:.1f}%)', 
-                     fontsize=12, fontweight='bold')
+        dirt_prob = probs[TargetLabels.get_by_value("dirt").index]
+        dirt_display = ax6.imshow(dirt_prob, cmap='Reds', vmin=0, vmax=1)
+        ax6.set_title(
+            f'Dirt Probability\n({results["aggregated_prediction"]["class_statistics"]["dirt_percentage"]:.1f}%)', 
+            fontsize=12, 
+            fontweight='bold'
+        )
         ax6.axis('off')
-        plt.colorbar(dirt_display, ax=ax6, fraction=0.046, pad=0.04)
+        plt.colorbar(dirt_display, ax=ax6,)
+
+        # Dirt binary mask
+        ax8 = fig.add_subplot(gs[1, 1])
+        ax8.imshow(results['aggregated_prediction']['binary_masks']['dirt'], cmap='Reds', vmin=0, vmax=1)
+        ax8.set_title('Dirt Binary Mask', fontsize=12, fontweight='bold')
+        ax8.axis('off')
         
         # Scratches probability map
-        ax7 = fig.add_subplot(gs[1, 1])
-        scratch_display = ax7.imshow(scratch_prob, cmap='Reds', vmin=0, vmax=1)
-        ax7.set_title(f'Dirt Probability\n({results["aggregated_prediction"]["class_statistics"]["scratches_percentage"]:.1f}%)', 
-                     fontsize=12, fontweight='bold')
+        ax7 = fig.add_subplot(gs[1, 2])
+        scratch_prob = probs[TargetLabels.get_by_value("scratch").index]
+        scratch_display = ax7.imshow(scratch_prob, cmap='Blues', vmin=0, vmax=1)
+        ax7.set_title(
+            f'Scratch Probability\n({results["aggregated_prediction"]["class_statistics"]["scratch_percentage"]:.1f}%)', 
+            fontsize=12,
+            fontweight='bold'
+        )
         ax7.axis('off')
-        plt.colorbar(scratch_display, ax=ax7, fraction=0.046, pad=0.04)
-        
-        # Dirt binary mask
-        ax8 = fig.add_subplot(gs[1, 2])
-        ax8.imshow(results['aggregated_prediction']['binary_masks']['dirt'], cmap='Greens', vmin=0, vmax=1)
-        ax8.set_title('Scratches Binary Mask', fontsize=12, fontweight='bold')
-        ax8.axis('off')
+        plt.colorbar(scratch_display, ax=ax7, )
         
         # Scratches binary mask
         ax9 = fig.add_subplot(gs[1, 3])
-        ax9.imshow(results['aggregated_prediction']['binary_masks']['scratches'], cmap='Reds', vmin=0, vmax=1)
-        ax9.set_title('Dirt Binary Mask', fontsize=12, fontweight='bold')
+        ax9.imshow(results['aggregated_prediction']['binary_masks']['scratch'], cmap='Blues', vmin=0, vmax=1)
+        ax9.set_title('Scratch Binary Mask', fontsize=12, fontweight='bold')
         ax9.axis('off')
         
         # Patch coverage visualization
@@ -802,17 +823,39 @@ class FullScreenPredictor:
         ax10.set_title(f'Patch Coverage\n(Max: {int(np.max(results["aggregated_prediction"]["coverage_count"]))} overlaps)', 
                       fontsize=12, fontweight='bold')
         ax10.axis('off')
-        plt.colorbar(coverage_display, ax=ax10, fraction=0.046, pad=0.04)
+        plt.colorbar(coverage_display, ax=ax10, )
+
+        # ================== ROW 3 =============================
+
+        # Condensation probability map
+        ax17 = fig.add_subplot(gs[2, 0])
+        condensation_prob = probs[TargetLabels.get_by_value("condensation").index]
+        scratch_display = ax17.imshow(condensation_prob, cmap='Greens', vmin=0, vmax=1)
+        ax17.set_title(
+            f'Condensation Probability\n({results["aggregated_prediction"]["class_statistics"]["condensation_percentage"]:.1f}%)', 
+            fontsize=12,
+            fontweight='bold'
+        )
+        ax17.axis('off')
+        plt.colorbar(scratch_display, ax=ax17, )
+        
+        # Scratches binary mask
+        ax18 = fig.add_subplot(gs[2, 1])
+        ax18.imshow(results['aggregated_prediction']['binary_masks']['condensation'], cmap='Greens', vmin=0, vmax=1)
+        ax18.set_title('Condensation Binary Mask', fontsize=12, fontweight='bold')
+        ax18.axis('off')
         
         # Row 3: Analysis and statistics
+
+
         # Patch statistics visualization
-        ax11 = fig.add_subplot(gs[2, 0])
+        ax11 = fig.add_subplot(gs[2, 2])
         patch_results = results['patch_analysis']['patch_results']
         valid_patches = [p for p in patch_results if 'error' not in p]
         
         if valid_patches and 'class_statistics' in valid_patches[0]:
             dirt_percentages = [p['class_statistics'].get('dirt_percentage', 0) for p in valid_patches]
-            scratch_percentages = [p['class_statistics'].get('scratches_percentage', 0) for p in valid_patches]
+            scratch_percentages = [p['class_statistics'].get('scratch_percentage', 0) for p in valid_patches]
             
             ax11.hist([dirt_percentages, scratch_percentages], bins=15, alpha=0.7, 
                      label=['Dirt', 'Scratches'], color=['green', 'red'])
@@ -827,7 +870,7 @@ class FullScreenPredictor:
             ax11.set_title('Patch Statistics', fontsize=12, fontweight='bold')
         
         # Class distribution pie chart
-        ax12 = fig.add_subplot(gs[2, 1])
+        ax12 = fig.add_subplot(gs[2, 3])
         class_stats = results['aggregated_prediction']['class_statistics']
         class_percentages = [
             class_stats.get('background_percentage', 0),
@@ -848,9 +891,18 @@ class FullScreenPredictor:
                     autopct='%1.1f%%', startangle=90)
         
         ax12.set_title('Screen Class Distribution', fontsize=12, fontweight='bold')
+
+        # Full phone with multi-class overlay
+        ax15 = fig.add_subplot(gs[2, 4])
+        full_with_overlay = self._create_full_phone_dirt_overlay(full_image, results)
+        ax15.imshow(full_with_overlay)
+        ax15.set_title('Full Phone Multi-Class Overlay', fontsize=12, fontweight='bold')
+        ax15.axis('off')
+
+        # ================== ROW 4 =============================
         
         # Region analysis visualization
-        ax13 = fig.add_subplot(gs[2, 2])
+        ax13 = fig.add_subplot(gs[3, 0])
         region_analysis = results['overall_statistics']['region_analysis']
         
         region_text = "REGION ANALYSIS:\n\n"
@@ -872,11 +924,11 @@ class FullScreenPredictor:
         ax13.text(0.05, 0.95, region_text, transform=ax13.transAxes,
                  verticalalignment='top', fontsize=10, fontfamily='monospace',
                  bbox=dict(boxstyle='round', facecolor='lightcyan', alpha=0.8))
-        ax13.set_title('Region Analysis', fontsize=12, fontweight='bold')
+        ax13.set_title('Region Analysis', fontsize=12, fontweight='bold', loc='left')
         ax13.axis('off')
         
         # Performance metrics
-        ax14 = fig.add_subplot(gs[2, 3])
+        ax14 = fig.add_subplot(gs[3, 1])
         perf_stats = results['overall_statistics']['performance_metrics']
         
         perf_text = f"""PERFORMANCE METRICS:
@@ -895,18 +947,13 @@ CLASSES: {results['model_info']['num_classes']}"""
         ax14.text(0.05, 0.95, perf_text, transform=ax14.transAxes,
                  verticalalignment='top', fontsize=10, fontfamily='monospace',
                  bbox=dict(boxstyle='round', facecolor='lightgreen', alpha=0.8))
-        ax14.set_title('Performance Metrics', fontsize=12, fontweight='bold')
+        ax14.set_title('Performance Metrics', fontsize=12, fontweight='bold', loc='left')
         ax14.axis('off')
         
-        # Full phone with multi-class overlay
-        ax15 = fig.add_subplot(gs[2, 4])
-        full_with_overlay = self._create_full_phone_dirt_overlay(full_image, results)
-        ax15.imshow(full_with_overlay)
-        ax15.set_title('Full Phone Multi-Class Overlay', fontsize=12, fontweight='bold')
-        ax15.axis('off')
+        
         
         # Bottom row: Comprehensive summary
-        ax16 = fig.add_subplot(gs[3, :])
+        ax16 = fig.add_subplot(gs[3, 2:])
         stats = results['overall_statistics']
         
         summary_text = f"""MULTI-CLASS FULL PHONE DIRT DETECTION ANALYSIS - {results['image_info']['filename']}
@@ -1064,3 +1111,634 @@ PERFORMANCE: Total Time: {stats['performance_metrics']['total_inference_time']:.
     def save_batch_full_phone_summary(self, results: List[Dict], save_path: str):
         """Legacy method name for backward compatibility"""
         self.save_batch_summary(results, save_path)
+
+
+    def full_phone_prediction_with_ground_truth(self, image_path: str, 
+                                               patch_size: int = 1024,
+                                               overlap: float = 0.2,
+                                               save_results: bool = True,
+                                               output_dir: str = None,
+                                               show_plot: bool = True,
+                                               min_dirt_threshold: float = 0.01) -> Dict:
+        """
+        Complete pipeline for full phone prediction WITH ground truth comparison
+        Reuses existing infrastructure efficiently
+        """
+        # Load full phone image and ground truth
+        self.logger.info(f"Loading full phone image with ground truth: {image_path}")
+        image, ground_truth, labels = self._load_full_phone_ground_truth_data(image_path)
+        
+        image_path = Path(image_path)
+        
+        # Run standard full phone prediction pipeline (reuse existing method)
+        prediction_results = self.single_prediction_pipeline(
+            str(image_path / "original_image.bmp"),  # Adjust based on your file naming
+            patch_size=patch_size,
+            overlap=overlap,
+            save_results=True,  # We'll handle saving ourselves
+            output_dir=output_dir,
+            show_plot=False,
+            min_dirt_threshold=min_dirt_threshold
+        )
+        
+        # Calculate ground truth comparison metrics efficiently
+        screen_coords = prediction_results['boundary_detection']['screen_area']
+        predicted_screen = prediction_results['aggregated_prediction']['class_prediction']
+        
+        # Prepare ground truth for comparison (resize to match predicted screen area)
+        gt_screen = self._prepare_ground_truth_for_comparison(
+            ground_truth, screen_coords, image.shape[:2], predicted_screen.shape
+        )
+        
+        # Calculate essential metrics using existing efficient methods
+        comparison_metrics = self.single_image_predictor._calculate_essential_metrics(
+            predicted_screen, gt_screen
+        )
+        
+        # Add ground truth information to results
+        prediction_results['ground_truth_comparison'] = {
+            'metrics': comparison_metrics,
+            'ground_truth_shape': gt_screen.shape,
+            'ground_truth_file': labels.get('mask_info', {}).get('mask_file', 'unknown'),
+            'comparison_area': 'screen_region_only'
+        }
+        
+        # Prepare output directory
+        if output_dir is None:
+            output_dir = image_path.parent / 'full_phone_gt_results'
+        else:
+            output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Save results with ground truth comparison
+        self.logger.info(f"saving {save_results = }")
+        if save_results:
+            # Save enhanced visualization with ground truth
+            vis_path = output_dir / f"{image_path.stem}_full_phone_gt_comparison.png"
+            self.logger.info(f"{str(vis_path)}")
+            self._visualize_full_phone_with_ground_truth(
+                image, prediction_results, gt_screen, labels,
+                save_path=str(vis_path), show_plot=show_plot
+            )
+            
+            # Save detailed results
+            results_path = output_dir / f"{image_path.stem}_gt_results.json"
+            # self.single_image_predictor.save_prediction_results(prediction_results, str(results_path))
+            
+            self.logger.info(f"Ground truth comparison results saved to: {output_dir}")
+        
+        # Print ground truth comparison summary
+        self._print_full_phone_gt_summary(prediction_results)
+        
+        return prediction_results
+
+    def _load_full_phone_ground_truth_data(self, data_path: str) -> Tuple[np.ndarray, np.ndarray, Dict]:
+        """Load full phone image with ground truth - reuses existing utilities"""
+        data_path = Path(data_path)
+        
+        # Expected files for full phone ground truth
+        image_candidates = ['full_phone_image.bmp', 'synthetic_dirty_patch.bmp', 'original_image.bmp']
+        mask_candidates = [
+            'segmentation_mask_multiclass.png',        # Full image multi-class mask
+            'segmentation_mask_combined.png',          # Full image binary mask
+            'segmentation_mask_patch_multiclass.png',  # Patch multi-class (fallback)
+            'segmentation_mask_patch.png'              # Patch binary (fallback)
+        ]
+        labels_candidates = ['labels.json', 'labels_patch.json']
+        
+        # Find available files
+        image_file = None
+        mask_file = None
+        labels_file = None
+        
+        for candidate in image_candidates:
+            if (data_path / candidate).exists():
+                image_file = candidate
+                break
+                
+        for candidate in mask_candidates:
+            if (data_path / candidate).exists():
+                mask_file = candidate
+                break
+                
+        for candidate in labels_candidates:
+            if (data_path / candidate).exists():
+                labels_file = candidate
+                break
+        
+        if not all([image_file, mask_file, labels_file]):
+            missing = []
+            if not image_file: missing.append("image file")
+            if not mask_file: missing.append("mask file") 
+            if not labels_file: missing.append("labels file")
+            raise FileNotFoundError(f"Missing files in {data_path}: {missing}")
+        
+        self.logger.debug(f"Loading: {image_file}, {mask_file}, {labels_file}")
+        
+        # Load files
+        image = cv2.imread(str(data_path / image_file))
+        if image is None:
+            raise ValueError(f"Could not load image: {data_path / image_file}")
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        
+        mask = cv2.imread(str(data_path / mask_file), cv2.IMREAD_GRAYSCALE)
+        mask = self.single_image_predictor.image_operations.resize_image(mask, 2)
+        if mask is None:
+            raise ValueError(f"Could not load mask: {data_path / mask_file}")
+        
+        with open(data_path / labels_file, 'r') as f:
+            labels = json.load(f)
+        
+        # Process mask (reuse existing logic)
+        mask_type = 'multiclass' if 'multiclass' in mask_file else 'binary'
+        mask = self._process_full_phone_mask(mask, mask_type)
+        
+        labels['mask_info'] = {
+            'mask_file': mask_file,
+            'mask_type': mask_type,
+            'image_file': image_file,
+            'labels_file': labels_file
+        }
+        
+        return image, mask, labels
+
+    def _process_full_phone_mask(self, mask: np.ndarray, mask_type: str) -> np.ndarray:
+        """Process full phone mask efficiently"""
+        if mask_type == 'multiclass':
+            # Ensure values are in correct range [0, 1, 2, 3]
+            if np.max(mask) > 4:
+                mask = np.clip(mask, 0, 4)
+            return mask.astype(np.uint8)
+        else:
+            # Binary mask - normalize to [0, 1]
+            if np.max(mask) > 1:
+                mask = (mask > 127).astype(np.uint8)
+            return mask
+
+    def _prepare_ground_truth_for_comparison(self, ground_truth: np.ndarray, 
+                                           screen_coords: Dict, 
+                                           full_image_shape: Tuple,
+                                           predicted_shape: Tuple) -> np.ndarray:
+        """Prepare ground truth mask for comparison with prediction"""
+        # Extract screen region from ground truth
+        x, y = screen_coords['x'], screen_coords['y'] 
+        w, h = screen_coords['width'], screen_coords['height']
+        
+        # Clip coordinates to image bounds
+        x = max(0, min(x, full_image_shape[1]))
+        y = max(0, min(y, full_image_shape[0]))
+        w = min(w, full_image_shape[1] - x)
+        h = min(h, full_image_shape[0] - y)
+        
+        gt_screen = ground_truth[y:y+h, x:x+w]
+        
+        # Resize to match prediction if needed
+        if gt_screen.shape != predicted_shape:
+            gt_screen = cv2.resize(gt_screen, (predicted_shape[1], predicted_shape[0]), 
+                                 interpolation=cv2.INTER_NEAREST)
+        
+        return gt_screen
+
+    def _visualize_full_phone_with_ground_truth(self, full_image: np.ndarray, 
+                                              results: Dict,
+                                              gt_screen: np.ndarray,
+                                              labels: Dict,
+                                              save_path: str = None,
+                                              show_plot: bool = True) -> plt.Figure:
+        """
+        Standalone visualization for full phone ground truth comparison
+        Similar to patch GT comparison but designed for full phone context
+        """
+        try:
+            fig, axes = plt.subplots(3, 5, figsize=(25, 15))
+            
+            # Get screen coordinates and predictions
+            screen_coords = results['boundary_detection']['screen_area']
+            predicted_screen = results['aggregated_prediction']['class_prediction']
+            screen_x, screen_y = screen_coords['x'] * 2, screen_coords['y'] * 2
+            screen_w, screen_h = screen_coords['width'] * 2, screen_coords['height'] * 2
+            
+            # Extract actual screen region from full image
+            screen_image = full_image[screen_y:screen_y+screen_h, screen_x:screen_x+screen_w]
+            
+            # ================= ROW 1: Basic Images and Boundaries =================
+            
+            # Full phone image with detected boundary
+            full_with_boundary = full_image.copy()
+            cv2.rectangle(full_with_boundary, (screen_x, screen_y), 
+                         (screen_x + screen_w, screen_y + screen_h),
+                         self.single_image_predictor.colors['screen_boundary'], 3)
+            axes[0, 0].imshow(full_with_boundary)
+            axes[0, 0].set_title(f'Full Phone Image\n(Size: {full_image.shape[1]}×{full_image.shape[0]})', 
+                                fontsize=12, fontweight='bold')
+            axes[0, 0].axis('off')
+            
+            # Extracted screen region
+            axes[0, 1].imshow(screen_image)
+            axes[0, 1].set_title(f'Screen Region\n(Size: {screen_w}×{screen_h})', 
+                                fontsize=12, fontweight='bold')
+            axes[0, 1].axis('off')
+            
+            # Ground truth screen area
+            gt_colored = self.single_image_predictor.create_multiclass_visualization(gt_screen)
+            axes[0, 2].imshow(gt_colored)
+            axes[0, 2].set_title('Ground Truth\n(Screen Area Only)', 
+                                fontsize=12, fontweight='bold')
+            axes[0, 2].axis('off')
+            
+            # Predicted screen area
+            pred_colored = self.single_image_predictor.create_multiclass_visualization(predicted_screen)
+            axes[0, 3].imshow(pred_colored)
+            axes[0, 3].set_title('Prediction\n(Screen Area Only)', 
+                                fontsize=12, fontweight='bold')
+            axes[0, 3].axis('off')
+            
+            # Prediction vs Ground Truth comparison
+            comparison = self.single_image_predictor.create_multiclass_comparison_mask(predicted_screen, gt_screen)
+            axes[0, 4].imshow(comparison)
+            axes[0, 4].set_title('Prediction vs GT\n(Yellow=Error)', 
+                                fontsize=12, fontweight='bold')
+            axes[0, 4].axis('off')
+            
+            # ================= ROW 2: Class-wise Analysis =================
+            
+            # Get class probabilities
+            class_probs = results['aggregated_prediction']['class_probabilities']
+            
+            # Background probability
+            bg_prob = class_probs['background']
+            bg_display = axes[1, 0].imshow(bg_prob, cmap='gray', vmin=0, vmax=1)
+            bg_percentage = results['aggregated_prediction']['class_statistics']['background_percentage']
+            axes[1, 0].set_title(f'Background Probability\n({bg_percentage:.1f}%)', 
+                                fontsize=12, fontweight='bold')
+            axes[1, 0].axis('off')
+            plt.colorbar(bg_display, ax=axes[1, 0], fraction=0.046, pad=0.04)
+            
+            # Condensation probability and GT
+            condensation_prob = class_probs['condensation']
+            condensation_display = axes[1, 1].imshow(condensation_prob, cmap='Greens', vmin=0, vmax=1)
+            condensation_percentage = results['aggregated_prediction']['class_statistics']['condensation_percentage']
+            axes[1, 1].set_title(f'Condensation Probability\n({condensation_percentage:.1f}%)', 
+                                fontsize=12, fontweight='bold')
+            axes[1, 1].axis('off')
+            plt.colorbar(condensation_display, ax=axes[1, 1], fraction=0.046, pad=0.04)
+            
+            # Dirt probability
+            dirt_prob = class_probs['dirt']
+            dirt_display = axes[1, 2].imshow(dirt_prob, cmap='Reds', vmin=0, vmax=1)
+            dirt_percentage = results['aggregated_prediction']['class_statistics']['dirt_percentage']
+            axes[1, 2].set_title(f'Dirt Probability\n({dirt_percentage:.1f}%)', 
+                                fontsize=12, fontweight='bold')
+            axes[1, 2].axis('off')
+            plt.colorbar(dirt_display, ax=axes[1, 2], fraction=0.046, pad=0.04)
+            
+            # Scratches probability
+            scratch_prob = class_probs['scratch']
+            scratch_display = axes[1, 3].imshow(scratch_prob, cmap='Blues', vmin=0, vmax=1)
+            scratch_percentage = results['aggregated_prediction']['class_statistics']['scratch_percentage']
+            axes[1, 3].set_title(f'Scratch Probability\n({scratch_percentage:.1f}%)', 
+                                fontsize=12, fontweight='bold')
+            axes[1, 3].axis('off')
+            plt.colorbar(scratch_display, ax=axes[1, 3], fraction=0.046, pad=0.04)
+            
+            # Combined defect probability
+            combined_defect_prob = np.maximum.reduce([
+                class_probs['condensation'],
+                class_probs['dirt'], 
+                class_probs['scratch']
+            ])
+            combined_display = axes[1, 4].imshow(combined_defect_prob, cmap='hot', vmin=0, vmax=1)
+            total_defects = condensation_percentage + dirt_percentage + scratch_percentage
+            axes[1, 4].set_title(f'Combined Defects\n({total_defects:.1f}%)', 
+                                fontsize=12, fontweight='bold')
+            axes[1, 4].axis('off')
+            plt.colorbar(combined_display, ax=axes[1, 4], fraction=0.046, pad=0.04)
+            
+            # ================= ROW 3: Overlays and Metrics =================
+            
+            # Screen with prediction overlay
+            screen_overlay = self.single_image_predictor.create_multiclass_overlay(
+                self.single_image_predictor.image_operations.resize_image(screen_image, 2), 
+                predicted_screen
+            )
+            axes[2, 0].imshow(screen_overlay)
+            axes[2, 0].set_title('Screen Prediction Overlay', fontsize=12, fontweight='bold')
+            axes[2, 0].axis('off')
+            
+            # Full phone with prediction overlay
+            full_overlay = self._create_full_phone_dirt_overlay(full_image, results)
+            axes[2, 1].imshow(full_overlay)
+            axes[2, 1].set_title('Full Phone Overlay', fontsize=12, fontweight='bold')
+            axes[2, 1].axis('off')
+            
+            # Ground truth binary masks for key classes
+            # Dirt GT vs Pred
+            gt_dirt_mask = (gt_screen == 2).astype(np.uint8)
+            pred_dirt_mask = (predicted_screen == 2).astype(np.uint8)
+            dirt_comparison = np.zeros((*gt_dirt_mask.shape, 3), dtype=np.uint8)
+            # TP = white, FP = red, FN = blue, TN = black
+            tp_dirt = (pred_dirt_mask == 1) & (gt_dirt_mask == 1)
+            fp_dirt = (pred_dirt_mask == 1) & (gt_dirt_mask == 0)
+            fn_dirt = (pred_dirt_mask == 0) & (gt_dirt_mask == 1)
+            dirt_comparison[tp_dirt] = [255, 255, 255]  # White - TP
+            dirt_comparison[fp_dirt] = [255, 0, 0]      # Red - FP
+            dirt_comparison[fn_dirt] = [0, 0, 255]      # Blue - FN
+            
+            axes[2, 2].imshow(dirt_comparison)
+            axes[2, 2].set_title('Dirt: TP/FP/FN\n(White/Red/Blue)', fontsize=12, fontweight='bold')
+            axes[2, 2].axis('off')
+            
+            # Scratch GT vs Pred
+            gt_scratch_mask = (gt_screen == 3).astype(np.uint8)
+            pred_scratch_mask = (predicted_screen == 3).astype(np.uint8)
+            scratch_comparison = np.zeros((*gt_scratch_mask.shape, 3), dtype=np.uint8)
+            tp_scratch = (pred_scratch_mask == 1) & (gt_scratch_mask == 1)
+            fp_scratch = (pred_scratch_mask == 1) & (gt_scratch_mask == 0)
+            fn_scratch = (pred_scratch_mask == 0) & (gt_scratch_mask == 1)
+            scratch_comparison[tp_scratch] = [255, 255, 255]  # White - TP
+            scratch_comparison[fp_scratch] = [255, 0, 0]      # Red - FP
+            scratch_comparison[fn_scratch] = [0, 0, 255]      # Blue - FN
+            
+            axes[2, 3].imshow(scratch_comparison)
+            axes[2, 3].set_title('Scratch: TP/FP/FN\n(White/Red/Blue)', fontsize=12, fontweight='bold')
+            axes[2, 3].axis('off')
+            
+            # Detailed metrics display
+            gt_metrics = results['ground_truth_comparison']['metrics']
+            patch_stats = results['patch_analysis']
+            perf_stats = results['overall_statistics']['performance_metrics']
+            
+            metrics_text = f"""FULL PHONE GROUND TRUTH COMPARISON
+            
+IMAGE INFO:
+• Full Size: {results['image_info']['full_image_size'][1]}×{results['image_info']['full_image_size'][0]}
+• Screen Size: {results['image_info']['screen_size'][1]}×{results['image_info']['screen_size'][0]}
+• Screen Coverage: {results['boundary_detection']['screen_percentage']:.1f}%
+
+GROUND TRUTH METRICS:
+• Mean IoU: {gt_metrics.get('mean_iou', 0):.3f}
+• Mean Dice: {gt_metrics.get('mean_dice', 0):.3f}
+
+PER-CLASS METRICS:"""
+            
+            for cls in range(self.single_image_predictor.num_classes):
+                class_name = self.single_image_predictor.class_names[cls]
+                iou_val = gt_metrics.get(f'{class_name}_iou', 0)
+                dice_val = gt_metrics.get(f'{class_name}_dice', 0)
+                metrics_text += f"\n• {class_name.title()}: IoU={iou_val:.3f}, Dice={dice_val:.3f}"
+            
+            metrics_text += f"""
+
+PATCH ANALYSIS:
+• Total Patches: {patch_stats['total_patches']}
+• Patches with Defects: {patch_stats['patches_with_defects']}
+
+PERFORMANCE:
+• Total Time: {perf_stats['total_inference_time']:.2f}s
+• Avg/Patch: {perf_stats['avg_patch_inference_time']:.3f}s
+• Device: {results['model_info']['device']}
+
+DATASET INFO:
+• GT File: {labels.get('mask_info', {}).get('mask_file', 'unknown')}
+• GT Type: {labels.get('mask_info', {}).get('mask_type', 'unknown')}"""
+            
+            axes[2, 4].text(0.05, 0.95, metrics_text, transform=axes[2, 4].transAxes,
+                           verticalalignment='top', fontsize=9, fontfamily='monospace',
+                           bbox=dict(boxstyle='round', facecolor='lightcyan', alpha=0.8))
+            axes[2, 4].set_title('GT Comparison Metrics', fontsize=12, fontweight='bold')
+            axes[2, 4].axis('off')
+            
+            # Add main title
+            fig.suptitle(f'Full Phone Ground Truth Comparison - {results["image_info"]["filename"]}', 
+                        fontsize=16, fontweight='bold')
+            
+            plt.tight_layout()
+            
+            if save_path:
+                plt.savefig(save_path, dpi=300, bbox_inches='tight')
+                self.logger.info(f"Full phone GT visualization saved to: {save_path}")
+            
+            if show_plot:
+                plt.show()
+            
+            return fig
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create full phone GT visualization: {e}")
+            return None
+
+    def _create_class_comparison_visualization(self, predicted: np.ndarray, ground_truth: np.ndarray, 
+                                             class_id: int) -> np.ndarray:
+        """Helper method to create TP/FP/FN visualization for a specific class"""
+        pred_mask = (predicted == class_id).astype(np.uint8)
+        gt_mask = (ground_truth == class_id).astype(np.uint8)
+        
+        comparison = np.zeros((*pred_mask.shape, 3), dtype=np.uint8)
+        
+        # Calculate confusion matrix components
+        tp = (pred_mask == 1) & (gt_mask == 1)      # True Positives - White
+        fp = (pred_mask == 1) & (gt_mask == 0)      # False Positives - Red  
+        fn = (pred_mask == 0) & (gt_mask == 1)      # False Negatives - Blue
+        tn = (pred_mask == 0) & (gt_mask == 0)      # True Negatives - Black
+        
+        comparison[tp] = [255, 255, 255]  # White
+        comparison[fp] = [255, 0, 0]      # Red
+        comparison[fn] = [0, 0, 255]      # Blue
+        comparison[tn] = [0, 0, 0]        # Black
+        
+        return comparison
+    
+
+    def _print_full_phone_gt_summary(self, results: Dict):
+        """Print summary including ground truth comparison"""
+        # Print standard summary first (reuse existing method)
+        self.print_full_phone_summary(results)
+        
+        # Add ground truth comparison summary
+        if 'ground_truth_comparison' in results:
+            gt_metrics = results['ground_truth_comparison']['metrics']
+            
+            self.logger.info(f"\nGROUND TRUTH COMPARISON:")
+            self.logger.info(f"  Mean IoU: {gt_metrics.get('mean_iou', 0):.3f}")
+            self.logger.info(f"  Mean Dice: {gt_metrics.get('mean_dice', 0):.3f}")
+            
+            for cls in range(self.single_image_predictor.num_classes):
+                class_name = self.single_image_predictor.class_names[cls]
+                iou_val = gt_metrics.get(f'{class_name}_iou', 0)
+                dice_val = gt_metrics.get(f'{class_name}_dice', 0)
+                self.logger.info(f"  {class_name.title()}: IoU={iou_val:.3f}, Dice={dice_val:.3f}")
+            
+            self.logger.info(f"="*80)
+
+    def batch_full_phone_prediction_with_ground_truth(self, dataset_dir: str,
+                                                     patch_size: int = 1024,
+                                                     overlap: float = 0.2,
+                                                     output_dir: str = None,
+                                                     max_samples: int = None,
+                                                     min_dirt_threshold: float = 0.01) -> List[Dict]:
+        """
+        Efficient batch processing of full phone images with ground truth
+        Reuses existing infrastructure
+        """
+        dataset_path = Path(dataset_dir)
+        if not dataset_path.exists():
+            raise FileNotFoundError(f"Dataset directory not found: {dataset_dir}")
+        
+        # Find dataset samples with full phone ground truth
+        sample_dirs = []
+        for item in dataset_path.iterdir():
+            if item.is_dir() and self._is_full_phone_gt_sample(item):
+                sample_dirs.append(item)
+        
+        if max_samples:
+            sample_dirs = sample_dirs[:max_samples]
+            
+        self.logger.info(f"Found {len(sample_dirs)} full phone ground truth samples")
+        
+        if output_dir is None:
+            output_dir = dataset_path / 'full_phone_gt_results'
+        else:
+            output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        results = []
+        from tqdm import tqdm
+        
+        for i, sample_dir in enumerate(tqdm(sample_dirs, desc="Processing full phone GT samples")):
+            try:
+                # Create sample output directory
+                sample_output_dir = output_dir / sample_dir.name
+                sample_output_dir.mkdir(exist_ok=True)
+                
+                # Process efficiently (reuse method)
+                result = self.full_phone_prediction_with_ground_truth(
+                    str(sample_dir),
+                    patch_size=patch_size,
+                    overlap=overlap,
+                    save_results=True,
+                    output_dir=str(sample_output_dir),
+                    show_plot=False,
+                    min_dirt_threshold=min_dirt_threshold
+                )
+                
+                # Add batch metadata
+                result['batch_info'] = {
+                    'sample_index': i,
+                    'sample_name': sample_dir.name,
+                    'status': 'completed'
+                }
+                
+                results.append(result)
+                
+            except Exception as e:
+                self.logger.error(f"Error processing {sample_dir.name}: {e}")
+                results.append({
+                    'batch_info': {
+                        'sample_index': i,
+                        'sample_name': sample_dir.name,
+                        'status': 'error',
+                        'error': str(e)
+                    }
+                })
+        
+        # Save batch summary efficiently
+        if results:
+            summary_path = output_dir / "batch_full_phone_gt_summary.json"
+            self._save_full_phone_gt_batch_summary(results, str(summary_path))
+            
+            successful = [r for r in results if r.get('batch_info', {}).get('status') == 'completed']
+            
+            self.logger.info(f"\nFull phone GT batch completed!")
+            self.logger.info(f"Processed {len(successful)}/{len(results)} samples successfully")
+            
+            # Log key aggregate metrics
+            if successful:
+                avg_iou = np.mean([r['ground_truth_comparison']['metrics']['mean_iou'] 
+                                 for r in successful if 'ground_truth_comparison' in r])
+                avg_dice = np.mean([r['ground_truth_comparison']['metrics']['mean_dice'] 
+                                  for r in successful if 'ground_truth_comparison' in r])
+                
+                self.logger.info(f"Average Mean IoU: {avg_iou:.3f}")
+                self.logger.info(f"Average Mean Dice: {avg_dice:.3f}")
+            
+            self.logger.info(f"Results saved to: {output_dir}")
+        
+        return results
+
+    def _is_full_phone_gt_sample(self, sample_dir: Path) -> bool:
+        """Check if directory contains full phone ground truth data"""
+        image_files = ['full_phone_image.bmp', 'synthetic_dirty_patch.bmp', 'original_image.bmp']
+        mask_files = ['segmentation_mask_multiclass.png', 'segmentation_mask_combined.png']
+        labels_files = ['labels.json', 'labels_patch.json']
+        
+        has_image = any((sample_dir / f).exists() for f in image_files)
+        has_mask = any((sample_dir / f).exists() for f in mask_files)
+        has_labels = any((sample_dir / f).exists() for f in labels_files)
+        
+        return has_image and has_mask and has_labels
+
+    def _save_full_phone_gt_batch_summary(self, results: List[Dict], save_path: str):
+        """Save efficient batch summary for full phone ground truth processing"""
+        import json
+        import time
+        
+        successful = [r for r in results if r.get('batch_info', {}).get('status') == 'completed']
+        errors = [r for r in results if r.get('batch_info', {}).get('status') == 'error']
+        
+        # Calculate aggregate metrics efficiently
+        aggregate_metrics = {}
+        if successful:
+            # Extract ground truth metrics
+            gt_metrics = [r['ground_truth_comparison']['metrics'] for r in successful 
+                         if 'ground_truth_comparison' in r]
+            
+            if gt_metrics:
+                iou_values = [m['mean_iou'] for m in gt_metrics if 'mean_iou' in m]
+                dice_values = [m['mean_dice'] for m in gt_metrics if 'mean_dice' in m]
+                
+                aggregate_metrics = {
+                    'ground_truth_comparison': {
+                        'count': len(gt_metrics),
+                        'avg_mean_iou': float(np.mean(iou_values)) if iou_values else 0,
+                        'avg_mean_dice': float(np.mean(dice_values)) if dice_values else 0,
+                        'std_mean_iou': float(np.std(iou_values)) if iou_values else 0,
+                        'min_mean_iou': float(np.min(iou_values)) if iou_values else 0,
+                        'max_mean_iou': float(np.max(iou_values)) if iou_values else 0
+                    }
+                }
+                
+                # Per-class aggregates
+                for cls in range(self.single_image_predictor.num_classes):
+                    class_name = self.single_image_predictor.class_names[cls]
+                    class_ious = [m.get(f'{class_name}_iou', 0) for m in gt_metrics]
+                    if class_ious:
+                        aggregate_metrics['ground_truth_comparison'][f'{class_name}_avg_iou'] = float(np.mean(class_ious))
+        
+        summary = {
+            'batch_info': {
+                'total_samples': len(results),
+                'successful_samples': len(successful),
+                'error_samples': len(errors),
+                'processing_type': 'full_phone_ground_truth_comparison',
+                'processing_date': time.strftime('%Y-%m-%d %H:%M:%S')
+            },
+            'model_info': {
+                'num_classes': self.single_image_predictor.num_classes,
+                'class_names': self.single_image_predictor.class_names
+            },
+            'aggregate_metrics': aggregate_metrics,
+            'individual_results': [
+                {
+                    'sample_name': r.get('batch_info', {}).get('sample_name', 'unknown'),
+                    'status': r.get('batch_info', {}).get('status', 'unknown'),
+                    'ground_truth_metrics': r.get('ground_truth_comparison', {}).get('metrics', {}),
+                    'inference_time': r.get('overall_statistics', {}).get('performance_metrics', {}).get('total_inference_time', 0),
+                    'error': r.get('batch_info', {}).get('error')
+                } for r in results
+            ]
+        }
+        
+        with open(save_path, 'w') as f:
+            json.dump(summary, f, indent=2, default=str)
+        
+        self.logger.info(f"Full phone GT batch summary saved to: {save_path}")

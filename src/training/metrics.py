@@ -9,21 +9,28 @@ import torch.nn.functional as F
 from src.core.logger_config import setup_application_logger
 
 
-def calculate_multiclass_iou(pred_logits: torch.Tensor, true_mask: torch.Tensor, 
+def calculate_multiclass_iou(pred_mask: torch.Tensor, true_mask: torch.Tensor, 
                              num_classes: int = 3, ignore_index: int = -1) -> Dict[str, float]:
-    """Calculate IoU for multi-class segmentation"""
-    # pred_logits shape: (B, C, H, W), true_mask shape: (B, H, W) or (B, 1, H, W)
+    """
+    Calculate IoU for multi-class segmentation
     
-    # Get predictions by taking argmax
-    pred_mask = torch.argmax(pred_logits, dim=1)  # (B, H, W)
-    
+    Args:
+        pred_mask: Predicted class indices tensor (B, H, W) - NOT logits
+        true_mask: Ground truth class indices tensor (B, H, W) or (B, 1, H, W)
+        num_classes: Number of classes
+        ignore_index: Class index to ignore
+    """
     # Handle true_mask dimensions
     if true_mask.dim() == 4:
-        true_mask = true_mask.squeeze(1)
+        true_mask = true_mask.squeeze(1)  # Remove channel dim if present
+    
+    # Ensure both tensors are (B, H, W)
+    if pred_mask.dim() == 4:
+        pred_mask = pred_mask.squeeze(1)
     
     # Flatten tensors
-    pred_mask = pred_mask.view(-1)
-    true_mask = true_mask.view(-1).long()
+    pred_flat = pred_mask.view(-1).long()
+    true_flat = true_mask.view(-1).long()
     
     ious = {}
     total_iou = 0
@@ -34,8 +41,8 @@ def calculate_multiclass_iou(pred_logits: torch.Tensor, true_mask: torch.Tensor,
             continue
             
         # Binary masks for current class
-        pred_cls = (pred_mask == cls)
-        true_cls = (true_mask == cls)
+        pred_cls = (pred_flat == cls)
+        true_cls = (true_flat == cls)
         
         # Calculate intersection and union
         intersection = (pred_cls & true_cls).sum().float()
@@ -47,7 +54,8 @@ def calculate_multiclass_iou(pred_logits: torch.Tensor, true_mask: torch.Tensor,
             total_iou += iou.item()
             valid_classes += 1
         else:
-            ious[f'iou_class_{cls}'] = 1.0  # Perfect score if class not present
+            # Perfect score if class not present in either prediction or ground truth
+            ious[f'iou_class_{cls}'] = 1.0
             total_iou += 1.0
             valid_classes += 1
     
@@ -57,19 +65,28 @@ def calculate_multiclass_iou(pred_logits: torch.Tensor, true_mask: torch.Tensor,
     return ious
 
 
-def calculate_multiclass_dice(pred_logits: torch.Tensor, true_mask: torch.Tensor, 
+def calculate_multiclass_dice(pred_mask: torch.Tensor, true_mask: torch.Tensor, 
                               num_classes: int = 3, ignore_index: int = -1) -> Dict[str, float]:
-    """Calculate Dice coefficient for multi-class segmentation"""
-    # Get predictions by taking argmax
-    pred_mask = torch.argmax(pred_logits, dim=1)  # (B, H, W)
+    """
+    Calculate Dice coefficient for multi-class segmentation
     
+    Args:
+        pred_mask: Predicted class indices tensor (B, H, W) - NOT logits  
+        true_mask: Ground truth class indices tensor (B, H, W) or (B, 1, H, W)
+        num_classes: Number of classes
+        ignore_index: Class index to ignore
+    """
     # Handle true_mask dimensions
     if true_mask.dim() == 4:
         true_mask = true_mask.squeeze(1)
     
+    # Ensure both tensors are (B, H, W)
+    if pred_mask.dim() == 4:
+        pred_mask = pred_mask.squeeze(1)
+    
     # Flatten tensors
-    pred_mask = pred_mask.view(-1)
-    true_mask = true_mask.view(-1).long()
+    pred_flat = pred_mask.view(-1).long()
+    true_flat = true_mask.view(-1).long()
     
     dice_scores = {}
     total_dice = 0
@@ -80,13 +97,13 @@ def calculate_multiclass_dice(pred_logits: torch.Tensor, true_mask: torch.Tensor
             continue
             
         # Binary masks for current class
-        pred_cls = (pred_mask == cls).float()
-        true_cls = (true_mask == cls).float()
+        pred_cls = (pred_flat == cls).float()
+        true_cls = (true_flat == cls).float()
         
         # Calculate intersection
         intersection = (pred_cls * true_cls).sum()
         
-        # Calculate dice
+        # Calculate dice coefficient
         dice = (2 * intersection) / (pred_cls.sum() + true_cls.sum() + 1e-8)
         
         dice_scores[f'dice_class_{cls}'] = dice.item()
