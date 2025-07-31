@@ -7,12 +7,12 @@ model:
   threshold: 0.5
 
 input:
-  path: "tests/batch3_out/Condensation"
+  path: "tests/test_images/batch3"
   image_extensions: [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]
   max_samples: null
 
 output:
-  dir: "tests/inference_results/batch3_out/Condensation"
+  dir: "tests/test_images/output/inference_results/full_phone_batch_predictions_with_gt"
 
 processing:
   batch_mode: True
@@ -24,4 +24,4 @@ processing:
     min_dirt_threshold: 0.01
 
 logging:
-  file: "logs/full_phone_batch_predictor1.log"
+  file: "logs/full_phone_batch_predictions_with_gt.log"

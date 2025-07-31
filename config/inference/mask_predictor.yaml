@@ -1,20 +1,20 @@
 # This config files aims to run prediction on patches with mask 
 
 model:
-  path: "models/best_model/best_model.pth"
+  path: "models/modified_new_synthetic_data_using_pred_dirt_at_35_july28/best_model.pth"
   device: "auto"
   threshold: 0.5
 
 input:
-  path: "tests/patches/patch_000_x377_y728/"
+  path: "tests/test_images/testing/patch_batch/patch_000_x402_y998/"
   image_extensions: [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]
   max_samples: null
 
 output:
-  dir: "tests/inference_results/patch_predictions"
+  dir: "tests/test_images/output/inference_results/patch_predictions"
 
 processing:
-  batch_mode: False
+  batch_mode: True
   new_images: False
   full_phone:
     enabled: False
@@ -23,4 +23,4 @@ processing:
     min_dirt_threshold: 0.01
 
 logging:
-  file: "logs/mask_predictor.log"
+  file: "logs/patch_predictions.log"

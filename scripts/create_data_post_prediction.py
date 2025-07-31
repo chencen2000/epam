@@ -74,22 +74,33 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
         
         self.scratch_inference_dir = scratch_inference_dir
         self.treat_inf_class = treat_inf_class
+        
+        # FIXED: Use proper TargetLabels enum for category colors and weights
         self.category_colors[self.treat_inf_class.value] = [128, 0, 128]
-        self.category_weights[self.treat_inf_class.index] = 0.0
+        
+        # Ensure scratch category has weight 0 (since we load from inference, not generate)
+        if self.treat_inf_class.value in self.dirt_categories:
+            self.dirt_categories[self.treat_inf_class.value] = 0.0
+        
+        # Update category weights to reflect we don't generate scratches
+        for i, cat_name in enumerate(self.category_names):
+            if cat_name == self.treat_inf_class.value:
+                self.category_weights[i] = 0.0
+                break
         
         
     def _discover_dirt_categories(self, dirt_base_dir: str) -> Dict:
         """
         Discover dirt categories from directory structure.
+        Maps each category to its corresponding TargetLabels enum.
         
         Args:
             dirt_base_dir: Base directory containing category subdirectories
             
         Returns:
-            Dictionary of dirt categories with IDs starting from 2 (after scratches=1)
+            Dictionary of dirt categories with IDs from TargetLabels enum
         """
         dirt_categories = {}
-        category_id = 2  # Start from 2 (scratches = 1, background = 0)
         
         if not os.path.exists(dirt_base_dir):
             self.logger.warning(f"Dirt base directory does not exist: {dirt_base_dir}")
@@ -103,15 +114,28 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
                 image_files = [f for f in os.listdir(category_path) 
                              if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
                 if image_files:
-                    dirt_categories[item] = {
-                        'id': category_id,
-                        'name': item,
-                        'weight': 1.0
-                    }
-                    category_id += 1
-                    self.logger.info(f"Discovered dirt category '{item}' with {len(image_files)} images")
-                if "scratch" == item.lower():
-                    dirt_categories[item]["weight"] = 0.0
+                    # FIXED: Map directory name to TargetLabels enum
+                    try:
+                        # Try to find matching TargetLabels enum
+                        target_label = None
+                        for label in TargetLabels:
+                            if label.value.lower() == item.lower():
+                                target_label = label
+                                break
+                        
+                        if target_label:
+                            dirt_categories[item] = {
+                                'id': target_label.index,
+                                'name': target_label.value,
+                                'weight': target_label.weight
+                            }
+                            self.logger.info(f"Discovered dirt category '{item}' -> TargetLabels.{target_label.name} (id={target_label.index}) with {len(image_files)} images")
+                        else:
+                            self.logger.warning(f"Directory '{item}' does not match any TargetLabels enum. Skipping.")
+                            
+                    except Exception as e:
+                        self.logger.error(f"Error mapping category '{item}': {e}")
+                        continue
         
         self.logger.info(f"Total dirt categories discovered: {list(dirt_categories.keys())}")
         return dirt_categories
@@ -184,7 +208,13 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
         # Convert to binary (0 or 1)
         screen_scratch_mask = (screen_scratch_mask > 127).astype(np.uint8)
         
-        self.logger.info(f"Loaded scratch mask with shape: {screen_scratch_mask.shape}")
+        # FIXED: Validate that mask contains scratch pixels
+        scratch_pixel_count = np.sum(screen_scratch_mask > 0)
+        if scratch_pixel_count == 0:
+            self.logger.warning(f"Loaded scratch mask is empty (no scratch pixels found)")
+            return None
+        
+        self.logger.info(f"Loaded scratch mask with shape: {screen_scratch_mask.shape}, scratch pixels: {scratch_pixel_count}")
         return screen_scratch_mask
     
     def place_scratch_mask_in_full_image(self, screen_scratch_mask: np.ndarray, 
@@ -233,300 +263,332 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
         self.logger.debug(f"Placed scratch mask at ({x},{y}), size ({w},{h}), final pixels: {scratch_pixels_final}")
         
         return full_scratch_mask
+
+    
+    def create_scratch_annotations(self, scratch_mask: np.ndarray, 
+                                category_id: int = None, 
+                                category_name: str = None) -> List[Dict]:
+        """
+        FIXED: Create annotations from scratch mask loaded from inference.
+        
+        Args:
+            scratch_mask: Binary scratch mask (0s and 1s)
+            category_id: Category ID for scratches (uses TargetLabels.SCRATCH.index if None)
+            category_name: Category name for scratches (uses TargetLabels.SCRATCH.value if None)
+            
+        Returns:
+            List of annotation dictionaries
+        """
+        annotations = []
+        
+        # FIXED: Use TargetLabels enum consistently
+        if category_id is None:
+            category_id = self.treat_inf_class.index
+        if category_name is None:
+            category_name = self.treat_inf_class.value
+        
+        # Convert mask to binary if needed
+        if scratch_mask.dtype != np.uint8:
+            scratch_mask = scratch_mask.astype(np.uint8)
+        
+        # Ensure binary values (0 or 255)
+        scratch_mask_binary = (scratch_mask > 0).astype(np.uint8) * 255
+        
+        # Find contours for scratches
+        contours, _ = cv2.findContours(scratch_mask_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        self.logger.debug(f"Found {len(contours)} scratch contours")
+        
+        for contour in contours:
+            # Filter out very small contours (noise)
+            area = cv2.contourArea(contour)
+            if area < 10:  # Minimum area threshold
+                continue
+                
+            # Get bounding box
+            x, y, w, h = cv2.boundingRect(contour)
+            
+            # Create segmentation points
+            segmentation_points = []
+            for point in contour:
+                segmentation_points.extend([int(point[0][0]), int(point[0][1])])
+            
+            # Create annotation
+            annotation = {
+                "bbox": [int(x), int(y), int(w), int(h)],
+                "segmentation": [segmentation_points],
+                "category_id": category_id,
+                "category_name": category_name,
+                "area": int(area)
+            }
+            annotations.append(annotation)
+            
+        self.logger.info(f"Created {len(annotations)} scratch annotations from mask")
+        return annotations
     
     def process_single_image(
-        self,
-        image_path: str,
-        output_dir: str,
-        bg_estimation_filter_size: int = 51,
-        num_vertices_per_side: int = 3,
-        max_distortion: float = 0.1,
-        patch_size: int = 1024,
-        generate_visualizations: bool = True
-    ) -> Dict:
+    self,
+    image_path: str,
+    output_dir: str,
+    bg_estimation_filter_size: int = 51,
+    num_vertices_per_side: int = 3,
+    max_distortion: float = 0.1,
+    patch_size: int = 1792,
+    generate_visualizations: bool = True,
+    num_versions: int = 1) -> Dict:
         """
-        Process a single full phone image with scratches and add dirt categories.
+        Process a single full phone image with scratches and add dirt categories,
+        generating multiple randomized versions.
         
         Returns:
-            Dictionary with processing results and statistics
+            Dictionary with per-version processing results and statistics
         """
+        from copy import deepcopy
         image_name = Path(image_path).name
         base_name = Path(image_path).stem
         self.logger.info(f"\n=== Processing {image_name} ===")
-        
-        # Load the high-resolution image
+
+        # Load the high-resolution image once
         self.logger.info(f"Loading high-resolution image: {image_path}")
         resized_img, (x, y, w, h) = self.preprocess_image_synthesis(image_name)
-        
-        # Load pre-existing scratch mask (in screen coordinates)
+
+        # Load scratch mask once
         screen_scratch_mask = self.load_scratch_mask_from_inference(image_name)
         if screen_scratch_mask is None:
             self.logger.warning(f"No scratch mask found for {image_name}, creating empty mask")
-            scratch_mask = np.zeros(resized_img.shape[:2], dtype=np.uint8)
+            scratch_mask_original = np.zeros(resized_img.shape[:2], dtype=np.uint8)
         else:
-            # Place scratch mask in full image with correct alignment
-            scratch_mask = self.place_scratch_mask_in_full_image(
+            scratch_mask_original = self.place_scratch_mask_in_full_image(
                 screen_scratch_mask, (x, y, w, h), resized_img.shape[:2]
             )
-            
-        # Log scratch mask info
-        scratch_pixels = np.sum(scratch_mask > 0)
-        self.logger.info(f"Scratch mask loaded: {scratch_pixels} pixels marked as scratches")
-            
-        # Initialize multi-class mask with scratches (class 1)
-        multiclass_mask = scratch_mask.copy()  # 0 for background, 1 for scratches
-        
-        # Count initial scratch pixels
-        initial_scratch_pixels = np.sum(scratch_mask > 0)
+        initial_scratch_pixels = np.sum(scratch_mask_original > 0)
         self.logger.info(f"Initial scratch pixels: {initial_scratch_pixels}")
-        
-        # FIXED: Initialize masks by category using discovered categories
-        masks_by_category = {'scratch': scratch_mask}
-        for category_name in self.dirt_categories.keys():
-            if category_name == self.treat_inf_class.value: continue
-            masks_by_category[category_name] = np.zeros(resized_img.shape[:2], dtype=np.uint8)
-        
-        # Prepare for dirt superimposition
-        image_float = resized_img.copy().astype(np.float32)
-        placed_bboxes = []
-        annotations_list = []
-        
-        # FIXED: Use parent class method to superimpose all dirt categories
-        self.logger.info(f"Superimposing {self.num_dirt_super_impose} dirt samples from categories: {list(self.dirt_categories.keys())}")
 
-        for selected_category in self.dirt_imgs_by_category:
-            if selected_category == self.treat_inf_class.value: continue
-            n_dirt = int(self.dirt_categories[selected_category] * self.num_dirt_super_impose)
-            self.logger.debug(f"for {selected_category = } needs {n_dirt} / {self.num_dirt_super_impose} superimposition...")
-            for dirt_idx in range(int(n_dirt)):
-                random_dirty_image = random.choice(self.dirt_imgs_by_category[selected_category])
-                random_dirty_image = f"{self.dirt_base_dir}/{selected_category}/{random_dirty_image}"
+        # FIXED: Create scratch annotations from the loaded mask
+        scratch_annotations = self.create_scratch_annotations(
+            scratch_mask_original, 
+            category_id=self.treat_inf_class.index, 
+            category_name=self.treat_inf_class.value
+        )
+        
+        self.logger.info(f"Added {len(scratch_annotations)} scratch annotations")
 
-                self.logger.debug(f"  Attempting to place {selected_category} sample {dirt_idx+1}/{n_dirt}")
-                self.logger.debug(f"    -> Using source: {random_dirty_image}")
+        # Output all versions' metadata
+        all_versions_metadata = {}
 
-                results = self.image_processor.process_dirt_mask_extraction(
-                    random_dirty_image, self.bg_estimation_filter_size
-                )
-                if results["low_threshold_mask"] is None or results["high_threshold_mask"] is None:
+        for version_idx in range(num_versions):
+            version_suffix = f"_v{version_idx:02d}"
+            version_dir = Path(output_dir) / f"{base_name}{version_suffix}"
+            version_dir.mkdir(parents=True, exist_ok=True)
+
+            self.logger.info(f"\n--- Generating version {version_idx + 1}/{num_versions} ---")
+
+            # Deep copy base image and scratch mask
+            image_float = resized_img.copy().astype(np.float32)
+            scratch_mask = scratch_mask_original.copy()
+
+            # Initialize masks - FIXED: Use TargetLabels enum values consistently
+            masks_by_category = {self.treat_inf_class.value: scratch_mask}
+            for category_name in self.dirt_categories.keys():
+                if category_name == self.treat_inf_class.value: 
                     continue
+                masks_by_category[category_name] = np.zeros(resized_img.shape[:2], dtype=np.uint8)
 
-                # Superimpose dirt with scratch-aware placement
-                image_float, updated_category_mask, placed_bbox = self.super_impose_dirt_with_scratch_priority(
-                    image_float, results, x, y, w, h,
-                    masks_by_category[selected_category], scratch_mask,
-                    10, placed_bboxes, annotations_list,
-                    category_id=self.category_names.index(selected_category), 
-                    category_name=selected_category,
-                    num_vertices_per_side=num_vertices_per_side, 
-                    max_distortion=max_distortion
-                )
-                # Update the category mask in the dictionary
-                masks_by_category[selected_category] = updated_category_mask
-                
-                if placed_bbox:
-                    placed_bboxes.append(placed_bbox)
+            placed_bboxes = []
+            annotations_list = []
 
+            # FIXED: Add scratch annotations to the list
+            annotations_list.extend(scratch_annotations)
+
+            self.logger.info(f"Superimposing {self.num_dirt_super_impose} dirt samples from categories...")
+
+            for selected_category in self.dirt_imgs_by_category:
+                if selected_category == self.treat_inf_class.value: 
+                    continue
+                    
+                # FIXED: Get category weight from TargetLabels enum
+                category_weight = self.dirt_categories[selected_category]
+                n_dirt = int(category_weight * self.num_dirt_super_impose)
                 
-        # Log mask statistics before creating multiclass mask
-        for category_name, mask in masks_by_category.items():
-            pixels = np.sum(mask > 0)
-            self.logger.info(f"  {category_name} pixels: {pixels}")
-        
-        # Update multiclass mask with all categories, ensuring proper priority
-        multiclass_mask = self.create_priority_multiclass_mask(masks_by_category)
-        
-        # Log final multiclass mask statistics
-        unique_values, counts = np.unique(multiclass_mask, return_counts=True)
-        class_distribution = dict(zip(unique_values, counts))
-        self.logger.info(f"Final multiclass mask distribution: {class_distribution}")
-        
-        # Convert back to uint8
-        synthetic_image = np.clip(image_float, 0, 255).astype(np.uint8)
-        
-        # Create output directory structure to match generate_data.py format
-        version_dir = Path(output_dir) / f"{base_name}_v00"
-        version_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Save outputs with correct naming
-        self.logger.info("Saving outputs...")
-        
-        try:
-            # Save synthetic image with correct naming
+                for dirt_idx in range(n_dirt):
+                    random_dirty_image = random.choice(self.dirt_imgs_by_category[selected_category])
+                    random_dirty_image_path = f"{self.dirt_base_dir}/{selected_category}/{random_dirty_image}"
+
+                    results = self.image_processor.process_dirt_mask_extraction(
+                        random_dirty_image_path,
+                        bg_estimation_filter_size,
+                        2
+                    )
+                    if results["low_threshold_mask"] is None or results["high_threshold_mask"] is None:
+                        continue
+
+                    # FIXED: Use TargetLabels enum index for category_id
+                    category_label = None
+                    for label in TargetLabels:
+                        if label.value == selected_category:
+                            category_label = label
+                            break
+                    
+                    if category_label is None:
+                        self.logger.warning(f"Category {selected_category} not found in TargetLabels enum")
+                        continue
+
+                    image_float, updated_category_mask, placed_bbox = self.super_impose_dirt_with_scratch_priority(
+                        image_float, results, x, y, w, h,
+                        masks_by_category[selected_category], scratch_mask,
+                        10, placed_bboxes, annotations_list,
+                        category_id=category_label.index,
+                        category_name=category_label.value,
+                        num_vertices_per_side=num_vertices_per_side,
+                        max_distortion=max_distortion
+                    )
+                    masks_by_category[selected_category] = updated_category_mask
+                    if placed_bbox:
+                        placed_bboxes.append(placed_bbox)
+
+            # FIXED: Create multiclass mask with consistent TargetLabels indices
+            multiclass_mask = self.create_priority_multiclass_mask_fixed(masks_by_category)
+
+            # Save synthetic image and masks
+            synthetic_image = np.clip(image_float, 0, 255).astype(np.uint8)
+
             self.image_processor.save_image(synthetic_image, str(version_dir / 'synthetic_dirty_image_full.png'))
-            
-            # FIXED: Save multiclass mask with correct number of classes
-            multiclass_mask_path = str(version_dir / 'segmentation_mask_multiclass.png')
-            max_class_id = max([0, 1] + [index for index in range(len(self.dirt_categories))])
+
+            # FIXED: Save multiclass mask with correct TargetLabels indices
+            max_class_id = max([label.index for label in TargetLabels])
             clean_multiclass_mask = np.clip(multiclass_mask, 0, max_class_id).astype(np.uint8)
-            success = cv2.imwrite(multiclass_mask_path, clean_multiclass_mask)
-            if not success:
-                self.logger.error(f"Failed to save multiclass mask to {multiclass_mask_path}")
-            else:
-                self.logger.debug(f"Saved multiclass mask with values {np.unique(clean_multiclass_mask)} to {multiclass_mask_path}")
-                # Validate the saved mask
-                expected_classes = [0, 1] + [index for index in range(len(self.dirt_categories))]
-                self.validate_saved_multiclass_mask(multiclass_mask_path, expected_classes)
-            
-            # FIXED: Save combined mask (binary all defects for compatibility)
+            cv2.imwrite(str(version_dir / 'segmentation_mask_multiclass.png'), clean_multiclass_mask)
+
             combined_mask = (multiclass_mask > 0).astype(np.uint8) * 255
             self.image_processor.save_image(combined_mask, str(version_dir / 'segmentation_mask_combined.png'))
-            
-            # Save individual class masks
+
             masks_dir = version_dir / 'category_masks'
             masks_dir.mkdir(exist_ok=True)
-            
             for category_name, mask in masks_by_category.items():
                 if np.any(mask):
-                    # Save as binary mask (0 or 255)
                     binary_mask = (mask > 0).astype(np.uint8) * 255
                     self.image_processor.save_image(binary_mask, str(masks_dir / f'mask_{category_name}.png'))
-                    self.logger.debug(f"Saved {category_name} mask with {np.sum(mask > 0)} pixels")
-                    
-        except Exception as e:
-            self.logger.error(f"Failed to save output files: {e}")
-            return None
-                
-        # FIXED: Calculate statistics for all classes
-        total_pixels = multiclass_mask.size
-        class_statistics = {}
-        
-        # Background
-        class_pixels = np.sum(multiclass_mask == 0)
-        class_statistics['background_pixels'] = int(class_pixels)
-        class_statistics['background_percentage'] = float((class_pixels / total_pixels) * 100)
-        
-        # Scratches
-        class_pixels = np.sum(multiclass_mask == 1)
-        class_statistics['scratches_pixels'] = int(class_pixels)
-        class_statistics['scratches_percentage'] = float((class_pixels / total_pixels) * 100)
-        
-        # All dirt categories
-        for index, category_name in enumerate(self.dirt_categories):
-            class_pixels = np.sum(multiclass_mask == index)
-            class_statistics[f'{category_name}_pixels'] = int(class_pixels)
-            class_statistics[f'{category_name}_percentage'] = float((class_pixels / total_pixels) * 100)
-            
-        # FIXED: Enhanced labels with all discovered categories
-        categories_dict = {
-            "0": {"name": "background", "supercategory": "background", "id": 0},
-            "1": {"name": "scratches", "supercategory": "defect", "id": 1}
-        }
-        
-        # Add all dirt categories to the categories dict
-        for index, category_name in enumerate(self.dirt_categories):
-            categories_dict[str(index)] = {
-                "name": category_name, 
-                "supercategory": "defect", 
-                "id": index
-            }
-        
-        enhanced_labels = {
-            "annotations": annotations_list,
-            "categories": categories_dict,
-            "image_size": [resized_img.shape[1], resized_img.shape[0]],  # [width, height]
-            "boundary_pixels": [x, y, x + w, y + h],
-            "category_statistics": self._calculate_category_stats(annotations_list),
-            "category_colors": self.category_colors,
-            "category_counts_attempted": self._get_category_counts_attempted(),
-            "success_rates": self._calculate_success_rates(self._get_category_counts_attempted(), annotations_list),
-        }
-        
-        with open(version_dir / 'labels_multi_category.json', 'w') as f:
-            json.dump(enhanced_labels, f, indent=4)
-        
-        # Generate patches if needed
-        if patch_size:
-            try:
-                self.logger.info(f"Generating patches of size {patch_size}...")
-                self.generate_patches_from_synthetic(
-                    synthetic_image, multiclass_mask, annotations_list,
-                    x, y, w, h, patch_size, version_dir / 'patches'
-                )
-            except Exception as e:
-                self.logger.error(f"Failed to generate patches: {e}")
-                # Continue even if patch generation fails
-        
-        # Generate visualizations if requested
-        if generate_visualizations:
-            viz_dir = version_dir / 'visualizations'
-            try:
-                
 
-                viz_image = synthetic_image
-                viz_masks = masks_by_category
-                
-                # Use parent's visualization method if available
-                self.generate_comprehensive_visualization(
-                    viz_image, viz_masks, annotations_list,
-                    viz_dir, base_name,
-                    category_counts=self._get_category_counts_attempted()
-                )
-            except Exception as e:
-                self.logger.error(f"Failed to generate visualization: {e}")
-                # Continue processing even if visualization fails
-            
-        # Save metadata
-        metadata = {
-            'source_image': image_name,
-            'image_size': list(resized_img.shape[:2]),
-            'screen_boundaries': [x, y, w, h],
-            'class_statistics': class_statistics,
-            'annotations': annotations_list,
-            'categories': categories_dict,
-            'processing_info': {
-                'initial_scratch_pixels': int(initial_scratch_pixels),
-                'dirt_samples_attempted': self.num_dirt_super_impose,
-                'dirt_categories_available': list(self.dirt_categories.keys())
+            # FIXED: Compute statistics using correct TargetLabels indices
+            total_pixels = multiclass_mask.size
+            class_statistics = {
+                'background_pixels': int(np.sum(multiclass_mask == TargetLabels.BACKGROUND.index)),
+                'background_percentage': float(np.sum(multiclass_mask == TargetLabels.BACKGROUND.index) / total_pixels * 100),
             }
-        }
-        
-        self.logger.info(f"Processing complete for {image_name}")
-        
-        return metadata
+            
+            # Add statistics for all TargetLabels
+            for label in TargetLabels:
+                if label == TargetLabels.BACKGROUND:
+                    continue  # Already handled above
+                class_pixels = np.sum(multiclass_mask == label.index)
+                class_statistics[f'{label.value}_pixels'] = int(class_pixels)
+                class_statistics[f'{label.value}_percentage'] = float((class_pixels / total_pixels) * 100)
+
+            self.logger.critical(f"{class_statistics = }")
+
+            # FIXED: Create categories dict using TargetLabels enum
+            categories_dict = {}
+            for label in TargetLabels:
+                categories_dict[str(label.index)] = {
+                    "name": label.value, 
+                    "supercategory": "background" if label == TargetLabels.BACKGROUND else "defect", 
+                    "id": label.index
+                }
+
+            enhanced_labels = {
+                "annotations": annotations_list,
+                "categories": categories_dict,
+                "image_size": [resized_img.shape[1], resized_img.shape[0]],
+                "boundary_pixels": [x, y, x + w, y + h],
+                "category_statistics": self._calculate_category_stats(annotations_list),
+                "category_colors": self.category_colors,
+                "category_counts_attempted": self._get_category_counts_attempted(),
+                "success_rates": self._calculate_success_rates(self._get_category_counts_attempted(), annotations_list),
+            }
+
+            with open(version_dir / 'labels_multi_category.json', 'w') as f:
+                json.dump(enhanced_labels, f, indent=4)
+
+            if patch_size:
+                try:
+                    self.logger.info(f"Generating patches of size {patch_size}...")
+                    self.generate_patches_from_synthetic(
+                        synthetic_image, multiclass_mask, annotations_list,
+                        x, y, w, h, patch_size, version_dir / 'patches'
+                    )
+                except Exception as e:
+                    self.logger.error(f"Failed to generate patches: {e}")
+
+            if generate_visualizations:
+                try:
+                    viz_dir = version_dir / 'visualizations'
+                    self.generate_comprehensive_visualization(
+                        synthetic_image, masks_by_category, annotations_list,
+                        viz_dir, base_name,
+                        category_counts=self._get_category_counts_attempted()
+                    )
+                except Exception as e:
+                    self.logger.error(f"Failed to generate visualization: {e}")
+
+            metadata = {
+                'source_image': image_name,
+                'image_size': list(resized_img.shape[:2]),
+                'screen_boundaries': [x, y, w, h],
+                'class_statistics': class_statistics,
+                'annotations': annotations_list,
+                'categories': categories_dict,
+                'processing_info': {
+                    'initial_scratch_pixels': int(initial_scratch_pixels),
+                    'dirt_samples_attempted': self.num_dirt_super_impose,
+                    'dirt_categories_available': list(self.dirt_categories.keys())
+                }
+            }
+
+            all_versions_metadata[version_suffix] = metadata
+
+        return all_versions_metadata
     
     def _get_category_counts_attempted(self):
-        """Get the attempted counts for each category"""
-        counts = {self.treat_inf_class.value: 1}  # Always attempt 1 scratch (from inference)
+        """FIXED: Get the attempted counts for each category using TargetLabels"""
+        counts = {}
         
-        # For dirt categories, approximate based on weights and total attempts
-        total_weight = sum(self.category_weights)
-        for i, category_name in enumerate(self.category_names):
-            category_weight = self.category_weights[i]
-            expected_count = int((category_weight / total_weight) * self.num_dirt_super_impose)
-            counts[category_name] = expected_count
+        # Scratch count (from inference, always 1 attempt)
+        counts[self.treat_inf_class.value] = 1
+        
+        # For dirt categories, use weights from TargetLabels enum
+        total_weight = sum(label.weight for label in TargetLabels if label != TargetLabels.BACKGROUND)
+        
+        for label in TargetLabels:
+            if label == TargetLabels.BACKGROUND or label == self.treat_inf_class:
+                continue
+            expected_count = int((label.weight / total_weight) * self.num_dirt_super_impose)
+            counts[label.value] = expected_count
             
         return counts
     
     def _calculate_category_stats(self, annotations):
-        """Calculate statistics for each category in the current image"""
+        """FIXED: Calculate statistics for each category using TargetLabels"""
         stats = {}
-        
-        # Initialize with all categories
-        stats[self.treat_inf_class.value] = 0
-        for category_name in self.dirt_categories.keys():
-            stats[category_name] = 0
+    
+        # Initialize with all TargetLabels categories
+        for label in TargetLabels:
+            if label == TargetLabels.BACKGROUND:
+                continue
+            stats[label.value] = 0
         
         for ann in annotations:
-            # More robust category name extraction
-            category_name = ann.get('category_name', None)
-            category_id = ann.get('category_id', 0)
+            category_name = ann.get('category_name', 'unknown')
+            category_id = ann.get('category_id', -1)
             
-            # If category_name is missing or unknown, try to map from category_id
-            if category_name is None or category_name == 'unknown':
-                if category_id == self.treat_inf_class.index:
-                    category_name = self.treat_inf_class.value
-                else:
-                    # Find category by ID
-                    for index, cat_name in enumerate(self.dirt_categories):
-                        if index == category_id:
-                            category_name = cat_name
-                            break
-                    else:
-                        category_name = 'unknown'
+            # Handle category mapping using TargetLabels
+            matched_label = None
+            for label in TargetLabels:
+                if label.value == category_name or label.index == category_id:
+                    matched_label = label
+                    break
             
-            if category_name in stats:
-                stats[category_name] += 1
+            if matched_label and matched_label.value in stats:
+                stats[matched_label.value] += 1
             else:
                 # Handle unknown categories
                 if 'unknown' not in stats:
@@ -536,11 +598,15 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
         return stats
 
     def _calculate_success_rates(self, category_counts, annotations):
-        """Calculate success rates for dirt placement by category"""
+        """FIXED: Calculate success rates using TargetLabels"""
         success_rates = {}
         annotation_counts = self._calculate_category_stats(annotations)
         
-        for category_name in [self.treat_inf_class.value] + list(self.dirt_categories.keys()):
+        for label in TargetLabels:
+            if label == TargetLabels.BACKGROUND:
+                continue
+                
+            category_name = label.value
             attempted = category_counts.get(category_name, 0)
             successful = annotation_counts.get(category_name, 0)
             
@@ -664,11 +730,13 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
                 if not (target_roi.shape[:2] == transformed_mask_low_distorted.shape[:2] == 
                        transformed_difference_float.shape[:2]):
                     continue
+
+                # Apply dirt effect naturally without respecting scratch boundaries
+                effective_dirt_mask = transformed_mask_low_distorted.astype(np.float32) / 255.0
                     
                 # Create mask that respects scratch priority
                 # Only apply dirt where there are no scratches
                 scratch_free_mask = (scratch_roi == 0).astype(np.float32)
-                effective_dirt_mask = transformed_mask_low_distorted.astype(np.float32) / 255.0
                 effective_dirt_mask = effective_dirt_mask * scratch_free_mask
                 
                 # Apply dirt effect only where there are no scratches
@@ -679,21 +747,22 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
                 result_roi = np.clip(result_roi, 0, 255)
                 base_image_float[place_y:y_end, place_x:x_end] = result_roi
                 
-                # Update dirt mask (only where no scratches)
-                # Create the new dirt mask respecting scratch boundaries
+                # For dirt mask accumulator, only add where there are no scratches
+                # This maintains scratch priority in the training targets
                 new_dirt = cv2.bitwise_and(transformed_mask_high, 
-                                          (scratch_free_mask * 255).astype(np.uint8))
+                                        (scratch_free_mask * 255).astype(np.uint8))
                 
                 # Ensure new_dirt is binary
                 _, new_dirt = cv2.threshold(new_dirt, 127, 1, cv2.THRESH_BINARY)
                 
-                # Update the accumulator mask
+                # Update the accumulator mask (only where no scratches)
                 dirt_mask_accumulator[place_y:y_end, place_x:x_end] = np.maximum(
                     dirt_mask_accumulator[place_y:y_end, place_x:x_end], 
                     new_dirt
                 )
                 
                 # Create annotations only for actual dirt areas (excluding scratches)
+                # This ensures training targets respect scratch priority
                 effective_mask_for_annotation = cv2.bitwise_and(
                     transformed_mask_high_distorted,
                     (scratch_free_mask * 255).astype(np.uint8)
@@ -770,9 +839,10 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
             self.logger.error(f"Error validating mask {mask_path}: {e}")
             return False
     
-    def create_priority_multiclass_mask(self, masks_by_category: Dict[str, np.ndarray]) -> np.ndarray:
+    def create_priority_multiclass_mask_fixed(self, masks_by_category: Dict[str, np.ndarray]) -> np.ndarray:
         """
-        Create multiclass mask with priority: scratches (1) > dirt categories (2, 3, ...) > background (0)
+        FIXED: Create multiclass mask with priority using TargetLabels enum indices consistently.
+        Priority: background (0) < dirt categories < scratches (highest priority)
         """
         height, width = next(iter(masks_by_category.values())).shape
         multiclass_mask = np.zeros((height, width), dtype=np.uint8)
@@ -780,22 +850,33 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
         # Debug logging
         self.logger.debug(f"Creating multiclass mask from categories: {list(masks_by_category.keys())}")
         
-        # Apply dirt categories first (in order of category ID, lowest priority)
-        for category_name, category_info in self.dirt_categories.items():
-            if category_name in masks_by_category:
-                category_mask = masks_by_category[category_name]
-                category_pixels = np.sum(category_mask > 0)
-                self.logger.debug(f"{category_name} mask shape: {category_mask.shape}, non-zero pixels: {category_pixels}")
-                # Set category pixels to their class ID
-                multiclass_mask[category_mask > 0] = self.category_names.index(category_name)
+        # Apply all categories using their TargetLabels enum indices
+        # Process in order of priority (lower index = lower priority, applied first)
+        categories_to_process = []
         
-        # Apply scratches last (highest priority)
-        if self.treat_inf_class.value in masks_by_category:
-            scratch_mask = masks_by_category[self.treat_inf_class.value]
-            scratch_pixels = np.sum(scratch_mask > 0)
-            self.logger.debug(f"Scratch mask shape: {scratch_mask.shape}, non-zero pixels: {scratch_pixels}")
-            # Set scratch pixels to class 1 (overwrites everything else)
-            multiclass_mask[scratch_mask > 0] = 1
+        for category_name, category_mask in masks_by_category.items():
+            if category_mask is None or not np.any(category_mask):
+                continue
+                
+            # Find corresponding TargetLabels enum
+            target_label = None
+            for label in TargetLabels:
+                if label.value == category_name:
+                    target_label = label
+                    break
+            
+            if target_label:
+                categories_to_process.append((target_label.index, category_name, category_mask))
+        
+        # Sort by index (priority) - lower indices applied first, higher indices (like scratches) applied last
+        categories_to_process.sort(key=lambda x: x[0])
+        
+        for label_index, category_name, category_mask in categories_to_process:
+            category_pixels = np.sum(category_mask > 0)
+            self.logger.debug(f"Applying {category_name} (index={label_index}) mask: {category_mask.shape}, non-zero pixels: {category_pixels}")
+            
+            # Apply category mask with its TargetLabels index
+            multiclass_mask[category_mask > 0] = label_index
             
         # Debug final mask
         unique_values, counts = np.unique(multiclass_mask, return_counts=True)
@@ -806,28 +887,13 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
     def create_indexed_segmentation_mask(self, masks_by_category: Dict[str, np.ndarray], 
                                         image_shape: Tuple[int, int]) -> np.ndarray:
         """
-        Create an indexed segmentation mask where each pixel value represents a category ID
-        Override parent method to ensure proper handling
+        FIXED: Create an indexed segmentation mask using TargetLabels enum indices
         """
-        height, width = image_shape[:2]
-        indexed_mask = np.zeros((height, width), dtype=np.uint8)
-        
-        # Apply masks in order of priority (highest priority applied last)
-        for index, category_name in enumerate(self.dirt_categories):
-            if category_name in masks_by_category:
-                category_mask = masks_by_category[category_name] > 0
-                indexed_mask[category_mask] = index
-            
-        if self.treat_inf_class.value in masks_by_category:
-            scratch_mask = masks_by_category[self.treat_inf_class.value] > 0
-            indexed_mask[scratch_mask] = 1
-            
-        return indexed_mask
+        return self.create_priority_multiclass_mask_fixed(masks_by_category)
     
-    def create_colored_segmentation_mask(self, masks_by_category, image_shape):
+    def create_colored_segmentation_mask_new(self, masks_by_category, image_shape):
         """
-        Override parent method to handle scratches category properly.
-        Create a colored segmentation mask where each category has a distinct color
+        FIXED: Create a colored segmentation mask using TargetLabels enum
         
         Args:
             masks_by_category: Dictionary of category masks
@@ -845,6 +911,16 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
         for category_name, mask in masks_by_category.items():
             if mask is None or not np.any(mask):
                 continue
+            
+            # Find corresponding TargetLabels enum
+            target_label = None
+            for label in TargetLabels:
+                if label.value == category_name:
+                    target_label = label
+                    break
+            
+            if not target_label:
+                continue
                 
             # Get category color
             color = self.category_colors.get(category_name, [128, 128, 128])  # Default gray
@@ -854,17 +930,10 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
             colored_mask[mask_bool] = color
             
             # Store legend info
-            if category_name == self.treat_inf_class.value:
-                category_id = self.treat_inf_class.index
-            elif category_name in self.dirt_categories:
-                category_id = self.category_names.index(category_name)
-            else:
-                category_id = 0  # Default to background
-                
             legend_info[category_name] = {
                 'color': color,
                 'pixel_count': np.sum(mask_bool),
-                'category_id': category_id
+                'category_id': target_label.index
             }
         
         return colored_mask, legend_info
@@ -873,7 +942,7 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
         self, synthetic_image, multiclass_mask, annotations,
         screen_x, screen_y, screen_w, screen_h, patch_size, output_dir
     ):
-        """Generate patches from the synthetic image with correct naming conventions"""
+        """FIXED: Generate patches using TargetLabels enum indices"""
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         
@@ -894,9 +963,9 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
             # Save patch image with correct naming
             self.image_processor.save_image(patch_img, str(patch_dir / 'synthetic_dirty_patch.png'))
             
-            # Save patch multiclass mask (raw values for training)
+            # FIXED: Save patch multiclass mask using TargetLabels indices
             patch_multiclass_path = str(patch_dir / 'segmentation_mask_patch_multiclass.png')
-            max_class_id = max([0, 1] + [i for i, cat in enumerate(self.dirt_categories)])
+            max_class_id = max([label.index for label in TargetLabels])
             clean_patch_mask = np.clip(patch_mask, 0, max_class_id).astype(np.uint8)
             success = cv2.imwrite(patch_multiclass_path, clean_patch_mask)
             if not success:
@@ -904,39 +973,32 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
             else:
                 self.logger.debug(f"Saved patch multiclass mask with values {np.unique(clean_patch_mask)} to {patch_multiclass_path}")
                 # Validate the saved patch mask
-                expected_classes = [0, 1] + [i for i, cat in enumerate(self.dirt_categories)]
+                expected_classes = [label.index for label in TargetLabels]
                 self.validate_saved_multiclass_mask(patch_multiclass_path, expected_classes)
             
             # Save binary combined mask for compatibility
             combined_patch_mask = (patch_mask > 0).astype(np.uint8) * 255
             self.image_processor.save_image(combined_patch_mask, str(patch_dir / 'segmentation_mask_patch.png'))
             
-            # Save individual category masks for patches
+            # FIXED: Save individual category masks using TargetLabels
             patch_masks_dir = patch_dir / 'category_masks'
             patch_masks_dir.mkdir(exist_ok=True)
             
-            # Create individual class masks from multiclass mask
-            # Scratches
-            if np.any(patch_mask == 1):
-                scratch_mask = (patch_mask == 1).astype(np.uint8) * 255
-                self.image_processor.save_image(scratch_mask, str(patch_masks_dir / f'patch_mask_scratches.png'))
-            
-            # All dirt categories
-            for index, category_name in enumerate(self.dirt_categories):
-                class_mask = (patch_mask == index).astype(np.uint8) * 255
+            # Create individual class masks from multiclass mask using TargetLabels
+            for label in TargetLabels:
+                if label == TargetLabels.BACKGROUND:
+                    continue
+                class_mask = (patch_mask == label.index).astype(np.uint8) * 255
                 if np.any(class_mask):
-                    self.image_processor.save_image(class_mask, str(patch_masks_dir / f'patch_mask_{category_name}.png'))
+                    self.image_processor.save_image(class_mask, str(patch_masks_dir / f'patch_mask_{label.value}.png'))
             
-            # Create categories dict for patch labels
-            patch_categories = {
-                "0": {"name": "background", "supercategory": "background", "id": 0},
-                "1": {"name": "scratches", "supercategory": "defect", "id": 1}
-            }
-            for category_name, category_info in self.dirt_categories.items():
-                patch_categories[str(index)] = {
-                    "name": category_name, 
-                    "supercategory": "defect", 
-                    "id": index
+            # FIXED: Create categories dict for patch labels using TargetLabels
+            patch_categories = {}
+            for label in TargetLabels:
+                patch_categories[str(label.index)] = {
+                    "name": label.value, 
+                    "supercategory": "background" if label == TargetLabels.BACKGROUND else "defect", 
+                    "id": label.index
                 }
             
             # Save patch labels with correct format
@@ -962,7 +1024,7 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
         bg_estimation_filter_size: int = 51,
         num_vertices_per_side: int = 3,
         max_distortion: float = 0.1,
-        patch_size: int = 1024,
+        patch_size: int = 1792,
         generate_visualizations: bool = True,
         max_images: Optional[int] = None
     ):
@@ -982,6 +1044,7 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
             
         if max_images:
             image_files = image_files[:max_images]
+        
             
         self.logger.info(f"Found {len(image_files)} images to process")
         
@@ -996,7 +1059,8 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
                     num_vertices_per_side=num_vertices_per_side,
                     max_distortion=max_distortion,
                     patch_size=patch_size,
-                    generate_visualizations=generate_visualizations
+                    generate_visualizations=generate_visualizations,
+                    num_versions=self.num_version_per_image
                 )
                 
                 if result:
@@ -1011,12 +1075,12 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
                 traceback.print_exc()
                 continue
                 
-        # Save dataset summary
+        # FIXED: Save dataset summary using TargetLabels
         summary = {
             'dataset_info': {
                 'total_images': len(results),
                 'classes': {
-                    f"{index}": f"{self.category_names[index]}" for index in range(len(self.category_names))
+                    str(label.index): label.value for label in TargetLabels
                 },
                 'source_directories': {
                     'full_phone_images': self.clean_dir,
@@ -1040,46 +1104,50 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
         self.logger.info(f"Dataset generation complete! Processed {len(results)} images.")
         self.logger.info(f"Results saved to: {output_path}")
         
-        # Print summary statistics
+        # FIXED: Print summary statistics using TargetLabels
         if results:
-            total_scratches = sum(r['class_statistics']['scratches_pixels'] for r in results)
-            total_pixels = sum(r['image_size'][0] * r['image_size'][1] for r in results)
+            total_pixels = sum(r['image_size'][0] * r['image_size'][1] for res in results for v, r in res.items())
             
             self.logger.info("\n=== DATASET SUMMARY ===")
             self.logger.info(f"Total images processed: {len(results)}")
             self.logger.info(f"Total pixels: {total_pixels:,}")
-            self.logger.info(f"Total scratch pixels: {total_scratches:,} ({total_scratches/total_pixels*100:.2f}%)")
             
-            # Statistics for each dirt category
-            for category_name in self.dirt_categories.keys():
-                total_category = sum(r['class_statistics'].get(f'{category_name}_pixels', 0) for r in results)
-                self.logger.info(f"Total {category_name} pixels: {total_category:,} ({total_category/total_pixels*100:.2f}%)")
+            # Statistics for each TargetLabels category
+            for label in TargetLabels:
+                if label == TargetLabels.BACKGROUND:
+                    continue
+                total_category = sum(r['class_statistics'].get(f'{label.value}_pixels', 0) for res in results for v, r in res.items())
+                self.logger.info(f"Total {label.value} pixels: {total_category:,} ({total_category/total_pixels*100:.2f}%)")
             
             self.logger.info("======================\n")
+
 
 def get_argparse():
     import argparse
     parser = argparse.ArgumentParser(description='Generate synthetic data with scratches and dirt categories')
+    
     # input directories
-    parser.add_argument('--scratch-inference-dir', type=str, default="tests/inf_dirt_only",
+    parser.add_argument('--scratch-inference-dir', type=str, default="tests/test_images/inference_result_dirt_only_model_scratch",
                        help='Directory containing scratch inference results')
-    parser.add_argument('--clean-images-dir', type=str, default="tests/crack",
+    parser.add_argument('--clean-images-dir', type=str, default="tests/test_images/temp",
                        help='Directory containing full phone images')
-    parser.add_argument('--dirt-categories-dir', type=str, default="C:/Users/umang_maheshwari/Desktop/FutureDial/repository/epam/tests/input_new/dirt_categories",
+    parser.add_argument('--dirt-categories-dir', type=str, default="tests/test_images/input/dirt_categories",
                        help='Base directory containing dirt category subdirectories (dirt, condensation, etc.)')
-    parser.add_argument('--output-dir', type=str, default='tests/demo',
-                       help='Output directory for synthetic data')
     
     # Output settings
+    parser.add_argument('--output-dir', type=str, default='tests/test_images/output/synthetic_dataset_post_prediction',
+                       help='Output directory for synthetic data')
+    
+    
     
     # Generation parameters
     parser.add_argument('--down-scale-clean-img', type=int, default=2,
                        help='Downscale factor for clean image')
-    parser.add_argument('--num-dirt', type=int, default=10,
+    parser.add_argument('--num-dirt', type=int, default=150,
                        help='Number of dirt samples to superimpose per image')
     parser.add_argument('--num-version', type=int, default=1,
                        help='Number of versions per clean image')
-    parser.add_argument('--patch-size', type=int, default=1024,
+    parser.add_argument('--patch-size', type=int, default=1792,
                        help='Size of patches to generate')
     parser.add_argument('--max-images', type=int, default=1,
                        help='Maximum number of images to process')

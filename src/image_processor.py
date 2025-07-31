@@ -258,7 +258,7 @@ class ImageProcessor:
 
         return low_thresh_mask, high_thresh_mask, abs_diff
     
-    def process_dirt_mask_extraction(self, image_path: str, bg_estimation_filter_size=51, resize_factor:int =False):
+    def process_dirt_mask_extraction(self, image_path: str, bg_estimation_filter_size=51, resize_factor:int = None):
         # Load image
         img = self.load_image(image_path, True)
         if resize_factor:

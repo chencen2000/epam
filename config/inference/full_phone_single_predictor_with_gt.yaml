@@ -7,12 +7,12 @@ model:
   threshold: 0.5
 
 input:
-  path: "tests/temp/350169642187164_598"
+  path: "tests/test_images/batch3/351486316454830_327_0_0_093017520"
   image_extensions: [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]
   max_samples: null
 
 output:
-  dir: "tests/inference_results/full_phone_single_predictions"
+  dir: "tests/test_images/output/inference_results/full_phone_single_predictions_with_gt"
 
 processing:
   batch_mode: False
@@ -24,4 +24,4 @@ processing:
     min_dirt_threshold: 0.01
 
 logging:
-  file: "logs/full_phone_single_predictor.log"
+  file: "logs/full_phone_single_predictions_with_gt.log"
