@@ -1,0 +1,27 @@
+# batch config files aims to run prediction on full phone image 
+# -> detect mobile boundary -> create patch and predict -> aggregate patch
+
+model:
+  path: "models/modified_new_superimposed_data_using_pred_dirt_at_35_july28_4/best_model.pth"
+  device: "auto"
+  threshold: 0.5
+
+input:
+  path: "tests/batch3_out/Condensation"
+  image_extensions: [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]
+  max_samples: null
+
+output:
+  dir: "tests/inference_results/batch3_out/Condensation"
+
+processing:
+  batch_mode: True
+  new_images: False
+  full_phone:
+    enabled: True
+    patch_size: 1792
+    overlap: 0
+    min_dirt_threshold: 0.01
+
+logging:
+  file: "logs/full_phone_batch_predictor1.log"

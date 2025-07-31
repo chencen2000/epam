@@ -1426,7 +1426,10 @@ PERFORMANCE: Total Time: {stats['performance_metrics']['total_inference_time']:.
             axes[2, 0].axis('off')
             
             # Full phone with prediction overlay
-            full_overlay = self._create_full_phone_dirt_overlay(full_image, results)
+            full_overlay = self._create_full_phone_dirt_overlay(
+                self.single_image_predictor.image_operations.resize_image(full_image, 2),
+                results
+            )
             axes[2, 1].imshow(full_overlay)
             axes[2, 1].set_title('Full Phone Overlay', fontsize=12, fontweight='bold')
             axes[2, 1].axis('off')
