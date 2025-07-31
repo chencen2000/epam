@@ -2,26 +2,26 @@
 # -> detect mobile boundary -> create patch and predict -> aggregate patch
 
 model:
-  path: "models/light_weight_new_synthetic_data/best_model.pth"
+  path: "models/modified_new_superimposed_data_using_pred_dirt_at_35_july28_4/best_model.pth"
   device: "auto"
-  threshold: 0.50
+  threshold: 0.5
 
 input:
-  path: "tests/testset//"
+  path: "tests/test_images/testing/full_phone_batch"
   image_extensions: [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]
   max_samples: null
 
 output:
-  dir: "tests/inference/"
+  dir: "tests/test_images/output/inference_results/full_phone_batch_predictions"
 
 processing:
   batch_mode: True
-  new_images: False
+  new_images: True
   full_phone:
     enabled: True
-    patch_size: 1024
+    patch_size: 1792
     overlap: 0
     min_dirt_threshold: 0.01
 
 logging:
-  file: "logs/full_phone_batch_predictor.log"
+  file: "logs/full_phone_batch_predictions.log"

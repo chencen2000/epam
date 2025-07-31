@@ -103,14 +103,11 @@ class SyntheticDataGenerator:
         base_colors = [
             [255, 255, 0],    # Yellow 
             [255, 0, 0],      # Red 
-            [0, 255, 255],    # Cyan
-            [255, 165, 0],    # Orange
-             
-            
+            [0, 255, 0],      # Green 
             [0, 0, 255],      # Blue 
             [255, 0, 255],    # Magenta
-            [0, 255, 0],      # Green
-            
+            [0, 255, 255],    # Cyan
+            [255, 165, 0],    # Orange
             [128, 0, 128],    # Purple
             [255, 192, 203],  # Pink
             [165, 42, 42]     # Brown
@@ -483,17 +480,17 @@ class SyntheticDataGenerator:
         
 
         for category in self.dirt_imgs_by_category:
-            n_dirt = int(self.dirt_categories[category] * self.num_dirt_super_impose)
+            n_dirt = self.dirt_categories[category] * self.num_dirt_super_impose
             self.logger.debug(f"for {category = } needs {n_dirt} / {self.num_dirt_super_impose} superimposition...")
             for dirt_idx in range(int(n_dirt)):
                 random_dirty_image = random.choice(self.dirt_imgs_by_category[category])
                 random_dirty_image = f"{self.dirt_base_dir}/{category}/{random_dirty_image}"
 
-                self.logger.debug(f"  Attempting to place {category} sample {dirt_idx+1}/{n_dirt}")
+                self.logger.debug(f"  Attempting to place {category} sample {dirt_idx+1}/{self.num_dirt_super_impose}")
                 self.logger.debug(f"    -> Using source: {random_dirty_image}")
 
                 results = self.image_processor.process_dirt_mask_extraction(
-                    random_dirty_image, self.bg_estimation_filter_size, resize_factor=True
+                    random_dirty_image, self.bg_estimation_filter_size,  resize_factor=2
                 )
 
                 if results["low_threshold_mask"] is None or results["high_threshold_mask"] is None:
@@ -863,7 +860,7 @@ class SyntheticDataGenerator:
     def generate_synthetic_data_using_clean_images(
             self, 
             output_dir: str, num_vertices_per_side: int = 3, max_distortion: float = 0.1, 
-            patch_size: int = 1024, generate_visualizations: bool = True, max_images: int = 1
+            patch_size: int = 1792, generate_visualizations: bool = True, max_images: int = 1
         ):
         """This method helps in generating the synthetic data using the clean images
 
@@ -881,11 +878,12 @@ class SyntheticDataGenerator:
 
         clean_images = os.listdir(self.clean_dir)
         self.logger.debug(f"Found {len(clean_images)} images under clean images")
-        if max_images:
-            clean_images = clean_images[:max_images]
+        max_images = max_images if max_images else len(clean_images)
+        clean_images = clean_images[:max_images]
 
         for i, image_name in tqdm(enumerate(clean_images), desc="total images processed: ", total=len(clean_images)):
-            self.logger.debug(f"=== Processing {image_name} ===")
+
+            self.logger.debug(f"=== Processing {image_name} {max_images = }===")
 
             resized_img, (x, y, w, h) = self.preprocess_image_synthesis(image_name)
 
@@ -907,7 +905,7 @@ class SyntheticDataGenerator:
                 ver_out_dir.mkdir(parents=True, exist_ok=True)
                 
                 # Save main outputs
-                self.save_dirty_and_mask_image(dirty_full, combined_mask, multiclass_mask, ver_out_dir)
+                self.save_dirty_and_mask_image(dirty_full, combined_mask, multiclass_mask, ver_out_dir, )
 
                 # Save category-specific masks
                 self.save_category_specific_masks(masks_by_category, ver_out_dir)
@@ -1040,33 +1038,29 @@ def get_argparse() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description='Generate synthetic dirt detection dataset')
     
     # Input directories
-    parser.add_argument('--clean-images-dir', type=str, default="C:/Users/umang_maheshwari/Desktop/FutureDial/repository/epam/tests/input/clean_images",
+    parser.add_argument('--clean-images-dir', type=str, default="tests/test_images/input/clean_images",
                        help='Directory containing clean phone images')
-    parser.add_argument('--dirt-categories-dir', type=str, default="C:/Users/umang_maheshwari/Desktop/FutureDial/repository/epam/tests/input_new/dirt_categories",
+    parser.add_argument('--dirt-categories-dir', type=str, default="tests/test_images/input/dirt_categories",
                        help='Directory containing clean phone images')
-    
-    # parser.add_argument('--dirt-samples', type=str, required=True,
-    #                    help='Directory containing dirt sample images')
-    # parser.add_argument('--scratch-masks', type=str,
-    #                    help='Optional directory containing scratch masks')
     
     # Output settings
-    parser.add_argument('--output-dir', type=str, default='tests/synthetic_testing_last',
+    parser.add_argument('--output-dir', type=str, default='tests/test_images/output/synthetic_dataset_by_superimposing',
                        help='Output directory for generated dataset')
     
     # Generation parameters
-    parser.add_argument('--down_scale_clean_img', type=int, default=1,
+    parser.add_argument('--down_scale_clean_img', type=int, default=2,
                        help='Downscale factor for clean image')
     parser.add_argument('--num-dirt', type=int, default=150,
                        help='Number of dirt samples per image')
-    parser.add_argument('--num-version', type=int, default=1,
+    parser.add_argument('--num-version', type=int, default=2,
                        help='Number of version of clean imags')
-    parser.add_argument('--patch-size', type=int, default=1024,
+    parser.add_argument('--patch-size', type=int, default=1792,
                        help='Size of patches to generate')
-    parser.add_argument('--max-images', type=int, default=3,
+    parser.add_argument('--max-images', type=int, default=None,
                        help='Maximum number of images to process')
     parser.add_argument('--no-visualizations', action='store_true',
                        help='Skip saving visualization images')
+    
     # Transformation parameters
     parser.add_argument('--num-vertices', type=int, default=3,
                        help='Number of vertices per side for distortion')
@@ -1089,7 +1083,7 @@ def main():
     log_level = logging.DEBUG if not args.debug else logging.INFO
     app_logger = setup_application_logger(
         app_name="scratch_dirt_generator",
-        log_file_name="logs/scratch_dirt_generation_yess.log"
+        log_file_name="logs/synthetic_dataset_by_superimposing.log"
     )
     app_logger.setLevel(log_level)
 

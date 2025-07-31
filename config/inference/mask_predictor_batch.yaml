@@ -6,13 +6,12 @@ model:
   threshold: 0.5
 
 input:
-  # path: "tests/patch_000_x402_y998/"
-  path: "tests/patches/"
+  path: "tests/test_images/testing/patch_batch/"
   image_extensions: [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]
   max_samples: null
 
 output:
-  dir: "tests/inference_results/patch_batch_predictions"
+  dir: "tests/test_images/output/inference_results/patch_batch_predictions"
 
 processing:
   batch_mode: True
@@ -24,4 +23,4 @@ processing:
     min_dirt_threshold: 0.01
 
 logging:
-  file: "logs/mask_predictor_batch.log"
+  file: "logs/patch_batch_predictions.log"
