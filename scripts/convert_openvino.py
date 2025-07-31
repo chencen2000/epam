@@ -56,7 +56,7 @@ if __name__ == "__main__":
     parser.add_argument("--pth_path", type=str, default="../models/light_weight_mix_data/best_model.pth", help="Path to .pth checkpoint file")
     parser.add_argument("--input_shape", type=int, nargs=4, default=(1, 1, 1792, 1792), help="Model input shape as (B, C, H, W)")
     parser.add_argument("--onnx_path", type=str, default="model.onnx", help="Path to save ONNX model")
-    parser.add_argument("--openvino_output_dir", type=str, default="./openvino_ir", help="Directory to save OpenVINO IR model")
+    parser.add_argument("--openvino_output_dir", type=str, default="../models/openvino_ir", help="Directory to save OpenVINO IR model")
     parser.add_argument("--n_channels", type=int, default=1, help="Number of input channels")
     parser.add_argument("--n_classes", type=int, default=4, help="Number of output classes")
     parser.add_argument("--bilinear", action="store_true",  help="Use bilinear upsampling")
