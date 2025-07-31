@@ -484,8 +484,6 @@ class PostPredictionSyntheticDataGenerator(SyntheticDataGenerator):
                 class_statistics[f'{label.value}_pixels'] = int(class_pixels)
                 class_statistics[f'{label.value}_percentage'] = float((class_pixels / total_pixels) * 100)
 
-            self.logger.critical(f"{class_statistics = }")
-
             # FIXED: Create categories dict using TargetLabels enum
             categories_dict = {}
             for label in TargetLabels:
@@ -1176,7 +1174,7 @@ def main():
     log_level = logging.DEBUG if args.debug else logging.INFO
     app_logger = setup_application_logger(
         app_name="data_generation_pp",
-        log_file_name="logs/scratch_dirt_post_prediction_generation.log"
+        log_file_name="logs/synthetic_dataset_post_prediction.log"
     )
     # app_logger.setLevel(log_level)
     

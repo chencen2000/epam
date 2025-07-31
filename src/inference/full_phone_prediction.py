@@ -230,10 +230,9 @@ class FullScreenPredictor:
                 new_img_resized
             )
 
-            if "_0_0_" in image_path.stem:
-                self.single_image_predictor.check_power_on_device_algo(
-                        output_dir, new_image, image_path.stem
-                )
+            self.single_image_predictor.check_power_on_device_algo(
+                    output_dir, new_image, image_path.stem
+            )
             
             # Save comprehensive visualization
             vis_path = output_dir / f"{image_path.stem}_full_phone_multiclass_analysis.png"

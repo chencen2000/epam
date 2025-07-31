@@ -1052,11 +1052,11 @@ def get_argparse() -> argparse.Namespace:
                        help='Downscale factor for clean image')
     parser.add_argument('--num-dirt', type=int, default=150,
                        help='Number of dirt samples per image')
-    parser.add_argument('--num-version', type=int, default=1,
+    parser.add_argument('--num-version', type=int, default=2,
                        help='Number of version of clean imags')
     parser.add_argument('--patch-size', type=int, default=1792,
                        help='Size of patches to generate')
-    parser.add_argument('--max-images', type=int, default=1,
+    parser.add_argument('--max-images', type=int, default=None,
                        help='Maximum number of images to process')
     parser.add_argument('--no-visualizations', action='store_true',
                        help='Skip saving visualization images')

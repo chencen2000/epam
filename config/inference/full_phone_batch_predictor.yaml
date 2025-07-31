@@ -7,7 +7,7 @@ model:
   threshold: 0.5
 
 input:
-  path: "tests/test_images/batch3"
+  path: "tests/test_images/testing/full_phone_batch"
   image_extensions: [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]
   max_samples: null
 
@@ -16,7 +16,7 @@ output:
 
 processing:
   batch_mode: True
-  new_images: False
+  new_images: True
   full_phone:
     enabled: True
     patch_size: 1792

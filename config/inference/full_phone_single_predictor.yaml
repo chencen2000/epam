@@ -7,7 +7,7 @@ model:
   threshold: 0.5
 
 input:
-  path: "tests/test_images/batch3/351486316454830_327_0_0_093017520"
+  path: "tests/test_images/testing/full_phone_batch/351486316454830_327_0_0_093017520.bmp"
   image_extensions: [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]
   max_samples: null
 
