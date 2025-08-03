@@ -1,5 +1,10 @@
+import sys
 from typing import Tuple
+from pathlib import Path
 from dataclasses import dataclass
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from src.target_labels import TargetLabels
 
 
 @dataclass
@@ -9,9 +14,9 @@ class TrainingConfig:
     num_epochs: int = 1
     batch_size: int = 1
     learning_rate: float = 1e-4
-    num_classes: int = 3  # Changed from 2 to 3 (background, dirt, scratches)
-    class_names: Tuple[str, ...] = ("background", "scratches", "dirt")  # Added class names
-    class_weights: Tuple[float, ...] = (0.3, 1.0, 1.2)  # Added class weights for imbalanced data
+    num_classes: int = len(TargetLabels.values())  # Changed from 2 to 3 (background, dirt, scratches)
+    class_names: Tuple[str, ...] =  tuple(TargetLabels.values())  # Added class names
+    class_weights: Tuple[float, ...] = (0.3, 1.0, 1.0, 1.2)  # Added class weights for imbalanced data
     target_size: Tuple[int, int] = (1024, 1024)
     accumulation_steps: int = 1
     val_split: float = 0.2

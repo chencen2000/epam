@@ -77,12 +77,14 @@ def train_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Module,
             masks = masks.to(device, non_blocking=True)
             
             with autocast(enabled=use_amp, device_type=device.type):
+            # with autocast(enabled=use_amp,):
                 outputs = model(images)
                 loss = criterion(outputs, masks) / accumulation_steps
             
             # Calculate multi-class metrics
-            batch_ious = calculate_multiclass_iou(outputs, masks, num_classes)
-            batch_dice = calculate_multiclass_dice(outputs, masks, num_classes)
+            # logger.info(f"{outputs.shape = } -- {masks.shape = } -- {torch.argmax(outputs, dim=1).shape}")
+            batch_ious = calculate_multiclass_iou(torch.argmax(outputs, dim=1), masks, num_classes)
+            batch_dice = calculate_multiclass_dice(torch.argmax(outputs, dim=1), masks, num_classes)
             
             # Accumulate metrics
             for key in batch_ious:
@@ -218,12 +220,13 @@ def validate_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Modul
                 masks = masks.to(device, non_blocking=True)
                 
                 with autocast(enabled=use_amp, device_type=device.type):
+                # with autocast(enabled=use_amp,):
                     outputs = model(images)
                     loss = criterion(outputs, masks)
                 
                 # Calculate multi-class metrics
-                batch_ious = calculate_multiclass_iou(outputs, masks, num_classes)
-                batch_dice = calculate_multiclass_dice(outputs, masks, num_classes)
+                batch_ious = calculate_multiclass_iou(torch.argmax(outputs, dim=1), masks, num_classes)
+                batch_dice = calculate_multiclass_dice(torch.argmax(outputs, dim=1), masks, num_classes)
                 
                 # Accumulate metrics
                 for key in batch_ious:
@@ -289,8 +292,53 @@ def validate_epoch(model: nn.Module, dataloader: DataLoader, criterion: nn.Modul
     
     return avg_loss, metrics
 
+def load_model(model_path: str, device, logger) -> None:
+        from torch import load
+        import os
 
-def train_model(config: TrainingConfig, image_ops: ImageOperations, logger: logging.Logger, arch_config: str) -> Tuple[nn.Module, Dict]:
+        """Load the trained model from checkpoint."""
+        logger.debug(f"Loading model from: {model_path}")
+        
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Model file not found: {model_path}")
+        
+        try:
+            checkpoint = load(model_path, map_location=device, weights_only=True)
+        except Exception as e:
+            logger.warning(f"Failed to load with weights_only=True: {e}")
+            logger.warning("Falling back to weights_only=False. Ensure the checkpoint is from a trusted source.")
+            checkpoint = load(model_path, map_location=device, weights_only=False)
+        
+        config = checkpoint.get('config', {})
+        architecture = config.get('model_architecture', 'standard')
+        logger.debug(f"architecture = {architecture}")
+        
+        # FIXED: Use correct channel count and classes for multi-class
+        num_classes = config.get('num_classes', 3)  # Default to 3 for multi-class
+        logger.debug(f"num_class = {num_classes}")
+        
+        model = UNet(
+            n_channels=1,  # FIXED: Grayscale input, not 3
+            n_classes=num_classes,  # FIXED: Use actual number of classes
+            bilinear=True,
+            architecture=architecture,
+            app_logger=logger,
+            config_path=None
+        ).to(device)
+        
+        model.load_state_dict(checkpoint['model_state_dict'])
+        # model.eval()
+        
+        logger.debug(f"Model loaded successfully!")
+        logger.debug(f"Architecture: {architecture}")
+        logger.debug(f"Device: {device}")
+        logger.debug(f"Number of classes: {num_classes}")
+        logger.debug(f"Model parameters: {sum(p.numel() for p in model.parameters()):,}")
+
+        return model
+
+
+def train_model(config: TrainingConfig, image_ops: ImageOperations, logger: logging.Logger, arch_config: str, model=None) -> Tuple[nn.Module, Dict]:
     """Enhanced main training function for multi-class segmentation"""
     
     # Setup
@@ -307,7 +355,7 @@ def train_model(config: TrainingConfig, image_ops: ImageOperations, logger: logg
     memory_tracker = MemoryTracker(enabled=config.memory_tracking)
     
     # Initialize checkpoint manager
-    checkpoint_manager = CheckpointManager(save_dir, keep_last_n=3)
+    checkpoint_manager = CheckpointManager(save_dir, keep_last_n=5)
     
     # Log training configuration
     logger.info("Training Configuration:")
@@ -390,14 +438,19 @@ def train_model(config: TrainingConfig, image_ops: ImageOperations, logger: logg
     
     # Initialize model
     logger.info("Initializing multi-class U-Net model...")
-    model = UNet(
-        n_channels=1,  # RGB input
-        n_classes=config.num_classes,  # 3 classes
-        bilinear=True,
-        architecture=config.model_architecture,
-        app_logger=logger,
-        config_path=arch_config,
-    ).to(device)
+    if model is None:
+        model = UNet(
+            n_channels=1,  # RGB input
+            n_classes=config.num_classes,  # 3 classes
+            bilinear=True,
+            architecture=config.model_architecture,
+            app_logger=logger,
+            config_path=arch_config,
+        )
+    else:
+        logger.info("----------------------- USING LOADED MODEL ---------------------")
+        model = load_model(model, device, logger)
+    model = model.to(device)
     
     # Log model information
     total_params = sum(p.numel() for p in model.parameters())
@@ -555,7 +608,8 @@ def train_model(config: TrainingConfig, image_ops: ImageOperations, logger: logg
         history['train_metrics'],
         history['val_metrics'],
         history['epoch_times'],
-        str(plot_path)
+        str(plot_path), 
+        full_dataset.class_names
     )
     
     # Save final history
