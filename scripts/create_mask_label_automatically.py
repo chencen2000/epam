@@ -187,6 +187,9 @@ def process_batch_with_indexed_gt(base_path, label_base_path,  save_path:str):
 
     for idx, dirt_type_name in enumerate(list_folders):
 
+        if ".DS_Store" in dirt_type_name:
+            continue
+
         # path = os.path.join(base_path, dirt_type_name)
         path = Path(base_path) / dirt_type_name
         label_path = Path(label_base_path) / dirt_type_name
@@ -195,6 +198,8 @@ def process_batch_with_indexed_gt(base_path, label_base_path,  save_path:str):
 
         all_subfolders = os.listdir(path)
         for sub_idx, device_id in enumerate (all_subfolders):
+            if ".DS_Store" in dirt_type_name:
+                continue
 
             folder_path = path / device_id
             label_folder_path = label_path / device_id
@@ -255,14 +260,14 @@ def process_batch_with_indexed_gt(base_path, label_base_path,  save_path:str):
                     # indexed_gt_path = os.path.join(folder_path, f"segmentation_mask_multiclass.png")
                     indexed_gt_path = write_path / "segmentation_mask_multiclass.png"
                     app_logger.debug(f"    saving indexed_gt_path = {str(indexed_gt_path)}")
-                    cv2.imwrite(indexed_gt_path, indexed_gt)
+                    cv2.imwrite(str(indexed_gt_path), indexed_gt)
 
                     # Optional: Create and save overlay for visualization
                     overlay_image = overlay_mask_and_labels(image, mask, labels_rgb)
                     overlay_image = cv2.resize(overlay_image, None, fx=0.2, fy=0.2)
                     overlay_path = write_path /  f"{str(image_basename)}_overlay.png"
                     app_logger.debug(f"    saving overlay_path = {str(overlay_path)}")
-                    cv2.imwrite(overlay_path, overlay_image)
+                    cv2.imwrite(str(overlay_path), overlay_image)
 
                     #  save original image 
                     app_logger.debug(f"    coping original from = {str(folder_path)}/{image_name} to = {str(write_path)}/original_image.bmp")
