@@ -221,9 +221,20 @@ def process_batch_with_indexed_gt(base_path, label_base_path,  save_path:str):
                 write_path = save_path / dirt_type_name / image_basename 
 
                 # Load image and labels
-                image_path = os.path.join(folder_path, image_name)
-                # labels_path = os.path.join(folder_path, f"{image_name.split('_')[0]}_map.png")
-                labels_path = os.path.join(label_folder_path, f"{image_basename}_map.png")
+                check_img_path = folder_path / image_name
+                if not os.path.exists(str(check_img_path)):
+                    app_logger.error(f"    Skipping: Image file not found - {check_img_path}")
+                    continue
+                
+                check_label_path = label_folder_path / f"{image_basename}_map.png"
+                if not os.path.exists(str(check_label_path)):
+                    app_logger.error(f"    Skipping: Labels file not found - {check_label_path}")
+                    continue
+
+                check_coco_path = label_folder_path / "coco.json"
+                if not os.path.exists(str(check_coco_path)):
+                    app_logger.error(f"    Skipping: coco json file not found - {check_coco_path}")
+                    continue
 
                 image = image_processor.load_image(folder_path / image_name, True)
                 labels = image_processor.load_image(label_folder_path / f"{image_basename}_map.png", False)
@@ -244,30 +255,27 @@ def process_batch_with_indexed_gt(base_path, label_base_path,  save_path:str):
                     # indexed_gt_path = os.path.join(folder_path, f"segmentation_mask_multiclass.png")
                     indexed_gt_path = write_path / "segmentation_mask_multiclass.png"
                     app_logger.debug(f"    saving indexed_gt_path = {str(indexed_gt_path)}")
-                    # cv2.imwrite(indexed_gt_path, indexed_gt)
+                    cv2.imwrite(indexed_gt_path, indexed_gt)
 
                     # Optional: Create and save overlay for visualization
                     overlay_image = overlay_mask_and_labels(image, mask, labels_rgb)
                     overlay_image = cv2.resize(overlay_image, None, fx=0.2, fy=0.2)
-                    # overlay_path = os.path.join(folder_path, f"{base_name}_overlay.png")
                     overlay_path = write_path /  f"{str(image_basename)}_overlay.png"
                     app_logger.debug(f"    saving overlay_path = {str(overlay_path)}")
-                    # cv2.imwrite(overlay_path, overlay_image)
+                    cv2.imwrite(overlay_path, overlay_image)
 
                     #  save original image 
-                    app_logger.debug(f"    coping original from = {str(folder_path)}/{image_name}")
-                    app_logger.debug(f"    saving original to = {str(write_path)}/original_image.bmp")
-                    # copy_rename_simple(folder_path / image_name, write_path, f"original_image.bmp")
+                    app_logger.debug(f"    coping original from = {str(folder_path)}/{image_name} to = {str(write_path)}/original_image.bmp")
+                    copy_rename_simple(folder_path / image_name, write_path, f"original_image.bmp")
 
                     #  save labels.json
-                    app_logger.debug(f"    coping label from = {str(label_folder_path)}/coco.json")
-                    app_logger.debug(f"    saving label to = {str(write_path)}/labels_patch.json")
-                    # copy_rename_simple(label_folder_path / coco.json, write_path, f"labels_patch.json")
+                    app_logger.debug(f"    coping label from = {str(label_folder_path)}/coco.json to {str(write_path)}/labels_patch.json")
+                    copy_rename_simple(label_folder_path / "coco.json", write_path, f"labels_patch.json")
                     
                 else:
                     app_logger.error(f"    Failed to load image or labels for {image_name}")
                 
-    app_logger.info("Complete!!!!")
+    app_logger.info("Data is now ready for inference - process completed")
 
 
 
