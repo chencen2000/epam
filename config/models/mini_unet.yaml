@@ -1,0 +1,16 @@
+architecture:
+  bilinear: true
+  initial:
+    out_channels: 16
+    dilation: true
+  encoder:
+    - out_channels: 32
+      dilation: true
+    - out_channels: 64
+      dilation: true
+  decoder:
+    - out_channels: 32
+      dilation: true
+    - out_channels: 16
+      dilation: true
+  output: {}

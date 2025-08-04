@@ -1,0 +1,27 @@
+# This config files aims to run prediction on single full phone image 
+# -> detect mobile boundary -> create patch and predict -> aggregate patch
+
+model:
+  path: "models/modified_new_superimposed_data_using_pred_dirt_at_35_july28_4/best_model.pth"
+  device: "auto"
+  threshold: 0.5
+
+input:
+  path: "tests/test_images/batch3/351486316454830_327_0_0_093017520"
+  image_extensions: [".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif"]
+  max_samples: null
+
+output:
+  dir: "tests/test_images/output/inference_results/full_phone_single_predictions_with_gt"
+
+processing:
+  batch_mode: False
+  new_images: False
+  full_phone:
+    enabled: True
+    patch_size: 1792
+    overlap: 0
+    min_dirt_threshold: 0.01
+
+logging:
+  file: "logs/full_phone_single_predictions_with_gt.log"

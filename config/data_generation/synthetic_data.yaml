@@ -1,0 +1,72 @@
+# Data Generation Configuration File
+
+# Application Settings
+app:
+  name: "data_generator"
+  debug: false
+  random_seed: 42
+
+# Logging Configuration
+logging:
+  log_file: "logs/data_generation1.log"
+  level: "INFO"
+
+# Directory Paths
+paths:
+  base_path: "../../data/training-dataset/Scratch"
+  # dirt_dir: "../../data/selected/new_dirt"
+  dirt_dir: "../../data/training-dataset/"
+  clean_image_dir: "../../data/selected/clean_downloaded_new_images/front"
+  output_base_path: "tests/del_test/"
+
+# Data Generation Parameters
+generation:
+  num_version_per_image: 1
+  num_dirt_super_impose: 100
+  clean_image_downscale_factor: 2
+  bg_estimation_filter_size: 51
+  
+  # Dirt transformation parameters
+  scale_dirt:
+    min: 0.75
+    max: 1.5
+  
+  rotation_range:
+    min: 0
+    max: 360
+
+  # Per-category dirt count ranges
+  dirt_count_per_category:
+    min: 5
+    max: 25
+  
+  # Ensure balanced dataset
+  force_category_balance: true
+  min_samples_per_category: 10
+
+# Image Processing Settings
+image_processing:
+  supported_formats: [".jpg", ".jpeg", ".png", ".bmp", ".tiff"]
+  max_image_size: 4096
+
+# Dirt Categories Configuration
+dirt_categories:
+  scratch: 
+    id: 1
+    name: "scratch"
+    weight: 0.5  # Probability weight for selection
+  dirt:
+    id: 2
+    name: "dirt"
+    weight: 0.5
+  
+  
+# Advanced Settings [ IGNORE ]
+advanced:
+  # Memory management
+  batch_size: 10
+  max_memory_usage_gb: 8
+  
+  # Quality settings
+  output_quality: 95
+  compression_level: 6

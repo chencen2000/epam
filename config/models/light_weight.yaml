@@ -1,0 +1,25 @@
+# config/lightweight_unet.yaml
+architecture:
+  bilinear: true
+  
+  initial:
+    out_channels: 24
+    dilation: true
+  
+  encoder:
+    - out_channels: 32
+      dilation: true
+    - out_channels: 40
+      dilation: true
+    - out_channels: 48
+      dilation: true
+  
+  decoder:
+    - out_channels: 32
+      dilation: true
+    - out_channels: 32
+      dilation: true
+    - out_channels: 32
+      dilation: true
+  
+  output: {}

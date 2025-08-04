@@ -1,0 +1,4774 @@
+<?xml version="1.0"?>
+<net name="main_graph" version="11">
+	<layers>
+		<layer id="0" name="input" type="Parameter" version="opset1">
+			<data shape="?,1,1792,1792" element_type="f32" />
+			<output>
+				<port id="0" precision="FP32" names="input">
+					<dim>-1</dim>
+					<dim>1</dim>
+					<dim>1792</dim>
+					<dim>1792</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="1" name="initial.weight_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="24, 1, 3, 3" offset="0" size="432" />
+			<output>
+				<port id="0" precision="FP16" names="initial.weight">
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="2" name="initial.weight" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="3" name="/initial/Conv/WithoutBiases" type="Convolution" version="opset1">
+			<data strides="2, 2" dilations="1, 1" pads_begin="1, 1" pads_end="1, 1" auto_pad="explicit" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>1</dim>
+					<dim>1792</dim>
+					<dim>1792</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="4" name="Reshape_58_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="1, 24, 1, 1" offset="432" size="48" />
+			<output>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="5" name="Reshape_58" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="6" name="/initial/Conv" type="Add" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/initial/Conv_output_0">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="7" name="enc1.down.weight_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="24, 24, 3, 3" offset="480" size="10368" />
+			<output>
+				<port id="0" precision="FP16" names="enc1.down.weight">
+					<dim>24</dim>
+					<dim>24</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="8" name="enc1.down.weight" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>24</dim>
+					<dim>24</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>24</dim>
+					<dim>24</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="9" name="/enc1/down/Conv" type="Convolution" version="opset1">
+			<data strides="2, 2" dilations="1, 1" pads_begin="1, 1" pads_end="1, 1" auto_pad="explicit" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>24</dim>
+					<dim>24</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/enc1/down/Conv_output_0">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="10" name="onnx::Conv_322_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="32, 24, 3, 3" offset="10848" size="13824" />
+			<output>
+				<port id="0" precision="FP16" names="onnx::Conv_322">
+					<dim>32</dim>
+					<dim>24</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="11" name="onnx::Conv_322" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>32</dim>
+					<dim>24</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>32</dim>
+					<dim>24</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="12" name="/enc1/double_conv/double_conv/double_conv.0/Conv/WithoutBiases" type="Convolution" version="opset1">
+			<data strides="1, 1" dilations="1, 1" pads_begin="1, 1" pads_end="1, 1" auto_pad="explicit" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>32</dim>
+					<dim>24</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="13" name="Reshape_73_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="1, 32, 1, 1" offset="24672" size="64" />
+			<output>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="14" name="Reshape_73" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="15" name="/enc1/double_conv/double_conv/double_conv.0/Conv" type="Add" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/enc1/double_conv/double_conv/double_conv.0/Conv_output_0">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="16" name="/enc1/double_conv/double_conv/double_conv.2/Relu" type="ReLU" version="opset1">
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32" names="/enc1/double_conv/double_conv/double_conv.2/Relu_output_0">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="17" name="onnx::Conv_325_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="32, 32, 3, 3" offset="24736" size="18432" />
+			<output>
+				<port id="0" precision="FP16" names="onnx::Conv_325">
+					<dim>32</dim>
+					<dim>32</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="18" name="onnx::Conv_325" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>32</dim>
+					<dim>32</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>32</dim>
+					<dim>32</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="19" name="/enc1/double_conv/double_conv/double_conv.3/Conv/WithoutBiases" type="Convolution" version="opset1">
+			<data strides="1, 1" dilations="1, 1" pads_begin="1, 1" pads_end="1, 1" auto_pad="explicit" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>32</dim>
+					<dim>32</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="20" name="Reshape_87_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="1, 32, 1, 1" offset="43168" size="64" />
+			<output>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="21" name="Reshape_87" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="22" name="/enc1/double_conv/double_conv/double_conv.3/Conv" type="Add" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/enc1/double_conv/double_conv/double_conv.3/Conv_output_0">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="23" name="/enc1/double_conv/double_conv/double_conv.5/Relu" type="ReLU" version="opset1">
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32" names="/enc1/double_conv/double_conv/double_conv.5/Relu_output_0">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="24" name="enc2.down.weight_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="32, 32, 3, 3" offset="43232" size="18432" />
+			<output>
+				<port id="0" precision="FP16" names="enc2.down.weight">
+					<dim>32</dim>
+					<dim>32</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="25" name="enc2.down.weight" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>32</dim>
+					<dim>32</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>32</dim>
+					<dim>32</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="26" name="/enc2/down/Conv" type="Convolution" version="opset1">
+			<data strides="2, 2" dilations="1, 1" pads_begin="1, 1" pads_end="1, 1" auto_pad="explicit" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>32</dim>
+					<dim>32</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/enc2/down/Conv_output_0">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="27" name="onnx::Conv_328_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="40, 32, 3, 3" offset="61664" size="23040" />
+			<output>
+				<port id="0" precision="FP16" names="onnx::Conv_328">
+					<dim>40</dim>
+					<dim>32</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="28" name="onnx::Conv_328" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>40</dim>
+					<dim>32</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>40</dim>
+					<dim>32</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="29" name="/enc2/double_conv/double_conv/double_conv.0/Conv/WithoutBiases" type="Convolution" version="opset1">
+			<data strides="1, 1" dilations="1, 1" pads_begin="1, 1" pads_end="1, 1" auto_pad="explicit" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>40</dim>
+					<dim>32</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="30" name="Reshape_103_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="1, 40, 1, 1" offset="84704" size="80" />
+			<output>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="31" name="Reshape_103" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="32" name="/enc2/double_conv/double_conv/double_conv.0/Conv" type="Add" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/enc2/double_conv/double_conv/double_conv.0/Conv_output_0">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="33" name="/enc2/double_conv/double_conv/double_conv.2/Relu" type="ReLU" version="opset1">
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32" names="/enc2/double_conv/double_conv/double_conv.2/Relu_output_0">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="34" name="onnx::Conv_331_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="40, 40, 3, 3" offset="84784" size="28800" />
+			<output>
+				<port id="0" precision="FP16" names="onnx::Conv_331">
+					<dim>40</dim>
+					<dim>40</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="35" name="onnx::Conv_331" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>40</dim>
+					<dim>40</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>40</dim>
+					<dim>40</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="36" name="/enc2/double_conv/double_conv/double_conv.3/Conv/WithoutBiases" type="Convolution" version="opset1">
+			<data strides="1, 1" dilations="1, 1" pads_begin="1, 1" pads_end="1, 1" auto_pad="explicit" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>40</dim>
+					<dim>40</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="37" name="Reshape_117_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="1, 40, 1, 1" offset="113584" size="80" />
+			<output>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="38" name="Reshape_117" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="39" name="/enc2/double_conv/double_conv/double_conv.3/Conv" type="Add" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/enc2/double_conv/double_conv/double_conv.3/Conv_output_0">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="40" name="/enc2/double_conv/double_conv/double_conv.5/Relu" type="ReLU" version="opset1">
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32" names="/enc2/double_conv/double_conv/double_conv.5/Relu_output_0">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="41" name="enc3.down.weight_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="40, 40, 3, 3" offset="113664" size="28800" />
+			<output>
+				<port id="0" precision="FP16" names="enc3.down.weight">
+					<dim>40</dim>
+					<dim>40</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="42" name="enc3.down.weight" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>40</dim>
+					<dim>40</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>40</dim>
+					<dim>40</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="43" name="/enc3/down/Conv" type="Convolution" version="opset1">
+			<data strides="2, 2" dilations="1, 1" pads_begin="1, 1" pads_end="1, 1" auto_pad="explicit" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>40</dim>
+					<dim>40</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/enc3/down/Conv_output_0">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>112</dim>
+					<dim>112</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="44" name="onnx::Conv_334_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="48, 40, 3, 3" offset="142464" size="34560" />
+			<output>
+				<port id="0" precision="FP16" names="onnx::Conv_334">
+					<dim>48</dim>
+					<dim>40</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="45" name="onnx::Conv_334" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>48</dim>
+					<dim>40</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>48</dim>
+					<dim>40</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="46" name="/enc3/double_conv/double_conv/double_conv.0/Conv/WithoutBiases" type="Convolution" version="opset1">
+			<data strides="1, 1" dilations="1, 1" pads_begin="1, 1" pads_end="1, 1" auto_pad="explicit" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>112</dim>
+					<dim>112</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>48</dim>
+					<dim>40</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32">
+					<dim>-1</dim>
+					<dim>48</dim>
+					<dim>112</dim>
+					<dim>112</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="47" name="Reshape_133_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="1, 48, 1, 1" offset="177024" size="96" />
+			<output>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>48</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="48" name="Reshape_133" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>48</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>48</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="49" name="/enc3/double_conv/double_conv/double_conv.0/Conv" type="Add" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>48</dim>
+					<dim>112</dim>
+					<dim>112</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>48</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/enc3/double_conv/double_conv/double_conv.0/Conv_output_0">
+					<dim>-1</dim>
+					<dim>48</dim>
+					<dim>112</dim>
+					<dim>112</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="50" name="/enc3/double_conv/double_conv/double_conv.2/Relu" type="ReLU" version="opset1">
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>48</dim>
+					<dim>112</dim>
+					<dim>112</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32" names="/enc3/double_conv/double_conv/double_conv.2/Relu_output_0">
+					<dim>-1</dim>
+					<dim>48</dim>
+					<dim>112</dim>
+					<dim>112</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="51" name="onnx::Conv_337_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="48, 48, 3, 3" offset="177120" size="41472" />
+			<output>
+				<port id="0" precision="FP16" names="onnx::Conv_337">
+					<dim>48</dim>
+					<dim>48</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="52" name="onnx::Conv_337" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>48</dim>
+					<dim>48</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>48</dim>
+					<dim>48</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="53" name="/enc3/double_conv/double_conv/double_conv.3/Conv/WithoutBiases" type="Convolution" version="opset1">
+			<data strides="1, 1" dilations="1, 1" pads_begin="1, 1" pads_end="1, 1" auto_pad="explicit" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>48</dim>
+					<dim>112</dim>
+					<dim>112</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>48</dim>
+					<dim>48</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32">
+					<dim>-1</dim>
+					<dim>48</dim>
+					<dim>112</dim>
+					<dim>112</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="54" name="Reshape_147_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="1, 48, 1, 1" offset="218592" size="96" />
+			<output>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>48</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="55" name="Reshape_147" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>48</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>48</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="56" name="/enc3/double_conv/double_conv/double_conv.3/Conv" type="Add" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>48</dim>
+					<dim>112</dim>
+					<dim>112</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>48</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/enc3/double_conv/double_conv/double_conv.3/Conv_output_0">
+					<dim>-1</dim>
+					<dim>48</dim>
+					<dim>112</dim>
+					<dim>112</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="57" name="/enc3/double_conv/double_conv/double_conv.5/Relu" type="ReLU" version="opset1">
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>48</dim>
+					<dim>112</dim>
+					<dim>112</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32" names="/enc3/double_conv/double_conv/double_conv.5/Relu_output_0">
+					<dim>-1</dim>
+					<dim>48</dim>
+					<dim>112</dim>
+					<dim>112</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="58" name="dec1.up.weight_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="48, 40, 2, 2" offset="218688" size="15360" />
+			<output>
+				<port id="0" precision="FP16" names="dec1.up.weight">
+					<dim>48</dim>
+					<dim>40</dim>
+					<dim>2</dim>
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="59" name="dec1.up.weight" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>48</dim>
+					<dim>40</dim>
+					<dim>2</dim>
+					<dim>2</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>48</dim>
+					<dim>40</dim>
+					<dim>2</dim>
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="60" name="ConvolutionBackpropData_150" type="ConvolutionBackpropData" version="opset1">
+			<data strides="2, 2" dilations="1, 1" pads_begin="0, 0" pads_end="0, 0" auto_pad="explicit" output_padding="0, 0" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>48</dim>
+					<dim>112</dim>
+					<dim>112</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>48</dim>
+					<dim>40</dim>
+					<dim>2</dim>
+					<dim>2</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="61" name="Reshape_152_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="1, 40, 1, 1" offset="234048" size="80" />
+			<output>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="62" name="Reshape_152" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="63" name="/dec1/up/ConvTranspose" type="Add" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/dec1/up/ConvTranspose_output_0">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="64" name="ShapeOf_8246" type="ShapeOf" version="opset3">
+			<data output_type="i64" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="I64">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="65" name="Constant_8247" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234128" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="66" name="Constant_8248" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="67" name="Gather_8249" type="Gather" version="opset8">
+			<data batch_dims="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64" />
+				<port id="2" precision="I64" />
+			</input>
+			<output>
+				<port id="3" precision="I64" names="/dec1/Gather_2_output_0" />
+			</output>
+		</layer>
+		<layer id="68" name="ShapeOf_8252" type="ShapeOf" version="opset3">
+			<data output_type="i64" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="I64">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="69" name="Constant_8253" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234128" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="70" name="Constant_8254" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="71" name="Gather_8255" type="Gather" version="opset8">
+			<data batch_dims="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64" />
+				<port id="2" precision="I64" />
+			</input>
+			<output>
+				<port id="3" precision="I64" names="/dec1/Gather_3_output_0" />
+			</output>
+		</layer>
+		<layer id="72" name="/dec1/Sub_1" type="Subtract" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec1/Sub_1_output_0" />
+			</output>
+		</layer>
+		<layer id="73" name="/dec1/Constant_4" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234144" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec1/Constant_4_output_0" />
+			</output>
+		</layer>
+		<layer id="74" name="/dec1/Div" type="Divide" version="opset1">
+			<data auto_broadcast="numpy" m_pythondiv="true" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec1/Cast_1_output_0,/dec1/Cast_output_0,/dec1/Div_output_0" />
+			</output>
+		</layer>
+		<layer id="75" name="Constant_191" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="76" name="/dec1/Unsqueeze_4" type="Unsqueeze" version="opset1">
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec1/Unsqueeze_4_output_0,/dec1/Unsqueeze_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="77" name="/dec1/Sub_2" type="Subtract" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec1/Sub_2_output_0" />
+			</output>
+		</layer>
+		<layer id="78" name="Constant_193" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="79" name="/dec1/Unsqueeze_5" type="Unsqueeze" version="opset1">
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec1/Unsqueeze_1_output_0,/dec1/Unsqueeze_5_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="80" name="Constant_8257" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234144" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="81" name="Constant_8258" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="82" name="Gather_8259" type="Gather" version="opset8">
+			<data batch_dims="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64" />
+				<port id="2" precision="I64" />
+			</input>
+			<output>
+				<port id="3" precision="I64" names="/dec1/Gather_output_0" />
+			</output>
+		</layer>
+		<layer id="83" name="Constant_8261" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234144" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="84" name="Constant_8262" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="85" name="Gather_8263" type="Gather" version="opset8">
+			<data batch_dims="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64" />
+				<port id="2" precision="I64" />
+			</input>
+			<output>
+				<port id="3" precision="I64" names="/dec1/Gather_1_output_0" />
+			</output>
+		</layer>
+		<layer id="86" name="/dec1/Sub" type="Subtract" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec1/Sub_output_0" />
+			</output>
+		</layer>
+		<layer id="87" name="/dec1/Constant_5" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234144" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec1/Constant_5_output_0" />
+			</output>
+		</layer>
+		<layer id="88" name="/dec1/Div_1" type="Divide" version="opset1">
+			<data auto_broadcast="numpy" m_pythondiv="true" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec1/Cast_2_output_0,/dec1/Cast_3_output_0,/dec1/Div_1_output_0" />
+			</output>
+		</layer>
+		<layer id="89" name="Constant_195" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="90" name="/dec1/Unsqueeze_6" type="Unsqueeze" version="opset1">
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec1/Unsqueeze_2_output_0,/dec1/Unsqueeze_6_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="91" name="/dec1/Sub_3" type="Subtract" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec1/Sub_3_output_0" />
+			</output>
+		</layer>
+		<layer id="92" name="Constant_197" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="93" name="/dec1/Unsqueeze_7" type="Unsqueeze" version="opset1">
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec1/Unsqueeze_3_output_0,/dec1/Unsqueeze_7_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="94" name="/dec1/Concat_1" type="Concat" version="opset1">
+			<data axis="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="2" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="3" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="4" precision="I64" names="/dec1/Cast_4_output_0,/dec1/Concat_1_output_0,/dec1/Concat_output_0">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="95" name="/dec1/ConstantOfShape" type="Const" version="opset1">
+			<data element_type="i64" shape="4" offset="234152" size="32" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec1/ConstantOfShape_output_0">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="96" name="/dec1/Concat_2" type="Concat" version="opset1">
+			<data axis="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>4</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec1/Concat_2_output_0">
+					<dim>8</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="97" name="/dec1/Constant_8" type="Const" version="opset1">
+			<data element_type="i64" shape="2" offset="234184" size="16" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec1/Constant_8_output_0">
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="98" name="/dec1/Reshape" type="Reshape" version="opset1">
+			<data special_zero="true" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>8</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>2</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec1/Reshape_output_0">
+					<dim>4</dim>
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="99" name="/dec1/Constant_10" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234200" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec1/Constant_10_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="100" name="/dec1/Constant_11" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234208" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec1/Constant_11_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="101" name="/dec1/Constant_12" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234200" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec1/Constant_12_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="102" name="/dec1/Constant_9" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec1/Constant_9_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="103" name="/dec1/Slice" type="Slice" version="opset8">
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+					<dim>2</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="2" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="3" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="4" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="5" precision="I64" names="/dec1/Slice_output_0">
+					<dim>4</dim>
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="104" name="Constant_220" type="Const" version="opset1">
+			<data element_type="i64" shape="2" offset="234216" size="16" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="105" name="/dec1/Transpose" type="Transpose" version="opset1">
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+					<dim>2</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>2</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec1/Transpose_output_0">
+					<dim>2</dim>
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="106" name="Constant_1567" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234200" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="107" name="/dec1/Reshape_1" type="Reshape" version="opset1">
+			<data special_zero="true" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>2</dim>
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec1/Cast_5_output_0,/dec1/Reshape_1_output_0">
+					<dim>8</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="108" name="Constant_227" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="109" name="Split_228" type="Split" version="opset1">
+			<data num_splits="2" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>8</dim>
+				</port>
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="3" precision="I64">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="110" name="Constant_226_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="" offset="234232" size="2" />
+			<output>
+				<port id="0" precision="FP16" />
+			</output>
+		</layer>
+		<layer id="111" name="Constant_226" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16" />
+			</input>
+			<output>
+				<port id="1" precision="FP32" />
+			</output>
+		</layer>
+		<layer id="112" name="/dec1/Pad" type="Pad" version="opset12">
+			<data pad_mode="constant" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="2" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="3" precision="FP32" />
+			</input>
+			<output>
+				<port id="4" precision="FP32" names="/dec1/Pad_output_0">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="113" name="/dec1/Concat_3" type="Concat" version="opset1">
+			<data axis="1" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/dec1/Concat_3_output_0">
+					<dim>-1</dim>
+					<dim>80</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="114" name="onnx::Conv_340_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="40, 80, 3, 3" offset="234234" size="57600" />
+			<output>
+				<port id="0" precision="FP16" names="onnx::Conv_340">
+					<dim>40</dim>
+					<dim>80</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="115" name="onnx::Conv_340" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>40</dim>
+					<dim>80</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>40</dim>
+					<dim>80</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="116" name="/dec1/double_conv/double_conv/double_conv.0/Conv/WithoutBiases" type="Convolution" version="opset1">
+			<data strides="1, 1" dilations="1, 1" pads_begin="1, 1" pads_end="1, 1" auto_pad="explicit" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>80</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>40</dim>
+					<dim>80</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="117" name="Reshape_342_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="1, 40, 1, 1" offset="291834" size="80" />
+			<output>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="118" name="Reshape_342" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="119" name="/dec1/double_conv/double_conv/double_conv.0/Conv" type="Add" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/dec1/double_conv/double_conv/double_conv.0/Conv_output_0">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="120" name="/dec1/double_conv/double_conv/double_conv.2/Relu" type="ReLU" version="opset1">
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32" names="/dec1/double_conv/double_conv/double_conv.2/Relu_output_0">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="121" name="onnx::Conv_343_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="40, 40, 3, 3" offset="291914" size="28800" />
+			<output>
+				<port id="0" precision="FP16" names="onnx::Conv_343">
+					<dim>40</dim>
+					<dim>40</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="122" name="onnx::Conv_343" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>40</dim>
+					<dim>40</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>40</dim>
+					<dim>40</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="123" name="/dec1/double_conv/double_conv/double_conv.3/Conv/WithoutBiases" type="Convolution" version="opset1">
+			<data strides="1, 1" dilations="1, 1" pads_begin="1, 1" pads_end="1, 1" auto_pad="explicit" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>40</dim>
+					<dim>40</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="124" name="Reshape_356_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="1, 40, 1, 1" offset="320714" size="80" />
+			<output>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="125" name="Reshape_356" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="126" name="/dec1/double_conv/double_conv/double_conv.3/Conv" type="Add" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>40</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/dec1/double_conv/double_conv/double_conv.3/Conv_output_0">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="127" name="/dec1/double_conv/double_conv/double_conv.5/Relu" type="ReLU" version="opset1">
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32" names="/dec1/double_conv/double_conv/double_conv.5/Relu_output_0">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="128" name="dec2.up.weight_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="40, 32, 2, 2" offset="320794" size="10240" />
+			<output>
+				<port id="0" precision="FP16" names="dec2.up.weight">
+					<dim>40</dim>
+					<dim>32</dim>
+					<dim>2</dim>
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="129" name="dec2.up.weight" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>40</dim>
+					<dim>32</dim>
+					<dim>2</dim>
+					<dim>2</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>40</dim>
+					<dim>32</dim>
+					<dim>2</dim>
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="130" name="ConvolutionBackpropData_359" type="ConvolutionBackpropData" version="opset1">
+			<data strides="2, 2" dilations="1, 1" pads_begin="0, 0" pads_end="0, 0" auto_pad="explicit" output_padding="0, 0" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>40</dim>
+					<dim>224</dim>
+					<dim>224</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>40</dim>
+					<dim>32</dim>
+					<dim>2</dim>
+					<dim>2</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="131" name="Reshape_361_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="1, 32, 1, 1" offset="331034" size="64" />
+			<output>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="132" name="Reshape_361" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="133" name="/dec2/up/ConvTranspose" type="Add" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/dec2/up/ConvTranspose_output_0">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="134" name="ShapeOf_8266" type="ShapeOf" version="opset3">
+			<data output_type="i64" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="I64">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="135" name="Constant_8267" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234128" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="136" name="Constant_8268" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="137" name="Gather_8269" type="Gather" version="opset8">
+			<data batch_dims="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64" />
+				<port id="2" precision="I64" />
+			</input>
+			<output>
+				<port id="3" precision="I64" names="/dec2/Gather_2_output_0" />
+			</output>
+		</layer>
+		<layer id="138" name="ShapeOf_8272" type="ShapeOf" version="opset3">
+			<data output_type="i64" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="I64">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="139" name="Constant_8273" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234128" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="140" name="Constant_8274" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="141" name="Gather_8275" type="Gather" version="opset8">
+			<data batch_dims="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64" />
+				<port id="2" precision="I64" />
+			</input>
+			<output>
+				<port id="3" precision="I64" names="/dec2/Gather_3_output_0" />
+			</output>
+		</layer>
+		<layer id="142" name="/dec2/Sub_1" type="Subtract" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec2/Sub_1_output_0" />
+			</output>
+		</layer>
+		<layer id="143" name="/dec2/Constant_4" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234144" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec2/Constant_4_output_0" />
+			</output>
+		</layer>
+		<layer id="144" name="/dec2/Div" type="Divide" version="opset1">
+			<data auto_broadcast="numpy" m_pythondiv="true" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec2/Cast_1_output_0,/dec2/Cast_output_0,/dec2/Div_output_0" />
+			</output>
+		</layer>
+		<layer id="145" name="Constant_400" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="146" name="/dec2/Unsqueeze_4" type="Unsqueeze" version="opset1">
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec2/Unsqueeze_4_output_0,/dec2/Unsqueeze_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="147" name="/dec2/Sub_2" type="Subtract" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec2/Sub_2_output_0" />
+			</output>
+		</layer>
+		<layer id="148" name="Constant_402" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="149" name="/dec2/Unsqueeze_5" type="Unsqueeze" version="opset1">
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec2/Unsqueeze_1_output_0,/dec2/Unsqueeze_5_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="150" name="Constant_8277" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234144" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="151" name="Constant_8278" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="152" name="Gather_8279" type="Gather" version="opset8">
+			<data batch_dims="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64" />
+				<port id="2" precision="I64" />
+			</input>
+			<output>
+				<port id="3" precision="I64" names="/dec2/Gather_output_0" />
+			</output>
+		</layer>
+		<layer id="153" name="Constant_8281" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234144" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="154" name="Constant_8282" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="155" name="Gather_8283" type="Gather" version="opset8">
+			<data batch_dims="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64" />
+				<port id="2" precision="I64" />
+			</input>
+			<output>
+				<port id="3" precision="I64" names="/dec2/Gather_1_output_0" />
+			</output>
+		</layer>
+		<layer id="156" name="/dec2/Sub" type="Subtract" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec2/Sub_output_0" />
+			</output>
+		</layer>
+		<layer id="157" name="/dec2/Constant_5" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234144" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec2/Constant_5_output_0" />
+			</output>
+		</layer>
+		<layer id="158" name="/dec2/Div_1" type="Divide" version="opset1">
+			<data auto_broadcast="numpy" m_pythondiv="true" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec2/Cast_2_output_0,/dec2/Cast_3_output_0,/dec2/Div_1_output_0" />
+			</output>
+		</layer>
+		<layer id="159" name="Constant_404" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="160" name="/dec2/Unsqueeze_6" type="Unsqueeze" version="opset1">
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec2/Unsqueeze_2_output_0,/dec2/Unsqueeze_6_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="161" name="/dec2/Sub_3" type="Subtract" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec2/Sub_3_output_0" />
+			</output>
+		</layer>
+		<layer id="162" name="Constant_406" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="163" name="/dec2/Unsqueeze_7" type="Unsqueeze" version="opset1">
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec2/Unsqueeze_3_output_0,/dec2/Unsqueeze_7_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="164" name="/dec2/Concat_1" type="Concat" version="opset1">
+			<data axis="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="2" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="3" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="4" precision="I64" names="/dec2/Cast_4_output_0,/dec2/Concat_1_output_0,/dec2/Concat_output_0">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="165" name="/dec2/ConstantOfShape" type="Const" version="opset1">
+			<data element_type="i64" shape="4" offset="234152" size="32" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec2/ConstantOfShape_output_0">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="166" name="/dec2/Concat_2" type="Concat" version="opset1">
+			<data axis="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>4</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec2/Concat_2_output_0">
+					<dim>8</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="167" name="/dec2/Constant_8" type="Const" version="opset1">
+			<data element_type="i64" shape="2" offset="234184" size="16" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec2/Constant_8_output_0">
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="168" name="/dec2/Reshape" type="Reshape" version="opset1">
+			<data special_zero="true" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>8</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>2</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec2/Reshape_output_0">
+					<dim>4</dim>
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="169" name="/dec2/Constant_10" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234200" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec2/Constant_10_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="170" name="/dec2/Constant_11" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234208" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec2/Constant_11_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="171" name="/dec2/Constant_12" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234200" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec2/Constant_12_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="172" name="/dec2/Constant_9" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec2/Constant_9_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="173" name="/dec2/Slice" type="Slice" version="opset8">
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+					<dim>2</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="2" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="3" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="4" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="5" precision="I64" names="/dec2/Slice_output_0">
+					<dim>4</dim>
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="174" name="Constant_429" type="Const" version="opset1">
+			<data element_type="i64" shape="2" offset="234216" size="16" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="175" name="/dec2/Transpose" type="Transpose" version="opset1">
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+					<dim>2</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>2</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec2/Transpose_output_0">
+					<dim>2</dim>
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="176" name="Constant_1568" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234200" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="177" name="/dec2/Reshape_1" type="Reshape" version="opset1">
+			<data special_zero="true" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>2</dim>
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec2/Cast_5_output_0,/dec2/Reshape_1_output_0">
+					<dim>8</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="178" name="Constant_436" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="179" name="Split_437" type="Split" version="opset1">
+			<data num_splits="2" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>8</dim>
+				</port>
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="3" precision="I64">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="180" name="Constant_435_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="" offset="234232" size="2" />
+			<output>
+				<port id="0" precision="FP16" />
+			</output>
+		</layer>
+		<layer id="181" name="Constant_435" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16" />
+			</input>
+			<output>
+				<port id="1" precision="FP32" />
+			</output>
+		</layer>
+		<layer id="182" name="/dec2/Pad" type="Pad" version="opset12">
+			<data pad_mode="constant" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="2" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="3" precision="FP32" />
+			</input>
+			<output>
+				<port id="4" precision="FP32" names="/dec2/Pad_output_0">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="183" name="/dec2/Concat_3" type="Concat" version="opset1">
+			<data axis="1" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/dec2/Concat_3_output_0">
+					<dim>-1</dim>
+					<dim>64</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="184" name="onnx::Conv_346_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="32, 64, 3, 3" offset="331098" size="36864" />
+			<output>
+				<port id="0" precision="FP16" names="onnx::Conv_346">
+					<dim>32</dim>
+					<dim>64</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="185" name="onnx::Conv_346" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>32</dim>
+					<dim>64</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>32</dim>
+					<dim>64</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="186" name="/dec2/double_conv/double_conv/double_conv.0/Conv/WithoutBiases" type="Convolution" version="opset1">
+			<data strides="1, 1" dilations="1, 1" pads_begin="1, 1" pads_end="1, 1" auto_pad="explicit" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>64</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>32</dim>
+					<dim>64</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="187" name="Reshape_551_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="1, 32, 1, 1" offset="367962" size="64" />
+			<output>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="188" name="Reshape_551" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="189" name="/dec2/double_conv/double_conv/double_conv.0/Conv" type="Add" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/dec2/double_conv/double_conv/double_conv.0/Conv_output_0">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="190" name="/dec2/double_conv/double_conv/double_conv.2/Relu" type="ReLU" version="opset1">
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32" names="/dec2/double_conv/double_conv/double_conv.2/Relu_output_0">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="191" name="onnx::Conv_349_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="32, 32, 3, 3" offset="368026" size="18432" />
+			<output>
+				<port id="0" precision="FP16" names="onnx::Conv_349">
+					<dim>32</dim>
+					<dim>32</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="192" name="onnx::Conv_349" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>32</dim>
+					<dim>32</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>32</dim>
+					<dim>32</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="193" name="/dec2/double_conv/double_conv/double_conv.3/Conv/WithoutBiases" type="Convolution" version="opset1">
+			<data strides="1, 1" dilations="1, 1" pads_begin="1, 1" pads_end="1, 1" auto_pad="explicit" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>32</dim>
+					<dim>32</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="194" name="Reshape_565_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="1, 32, 1, 1" offset="386458" size="64" />
+			<output>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="195" name="Reshape_565" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="196" name="/dec2/double_conv/double_conv/double_conv.3/Conv" type="Add" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>32</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/dec2/double_conv/double_conv/double_conv.3/Conv_output_0">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="197" name="/dec2/double_conv/double_conv/double_conv.5/Relu" type="ReLU" version="opset1">
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32" names="/dec2/double_conv/double_conv/double_conv.5/Relu_output_0">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="198" name="dec3.up.weight_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="32, 24, 2, 2" offset="386522" size="6144" />
+			<output>
+				<port id="0" precision="FP16" names="dec3.up.weight">
+					<dim>32</dim>
+					<dim>24</dim>
+					<dim>2</dim>
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="199" name="dec3.up.weight" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>32</dim>
+					<dim>24</dim>
+					<dim>2</dim>
+					<dim>2</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>32</dim>
+					<dim>24</dim>
+					<dim>2</dim>
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="200" name="ConvolutionBackpropData_568" type="ConvolutionBackpropData" version="opset1">
+			<data strides="2, 2" dilations="1, 1" pads_begin="0, 0" pads_end="0, 0" auto_pad="explicit" output_padding="0, 0" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>32</dim>
+					<dim>448</dim>
+					<dim>448</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>32</dim>
+					<dim>24</dim>
+					<dim>2</dim>
+					<dim>2</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="201" name="Reshape_570_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="1, 24, 1, 1" offset="392666" size="48" />
+			<output>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="202" name="Reshape_570" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="203" name="/dec3/up/ConvTranspose" type="Add" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/dec3/up/ConvTranspose_output_0">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="204" name="ShapeOf_8286" type="ShapeOf" version="opset3">
+			<data output_type="i64" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="I64">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="205" name="Constant_8287" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234128" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="206" name="Constant_8288" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="207" name="Gather_8289" type="Gather" version="opset8">
+			<data batch_dims="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64" />
+				<port id="2" precision="I64" />
+			</input>
+			<output>
+				<port id="3" precision="I64" names="/dec3/Gather_2_output_0" />
+			</output>
+		</layer>
+		<layer id="208" name="ShapeOf_8292" type="ShapeOf" version="opset3">
+			<data output_type="i64" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="I64">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="209" name="Constant_8293" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234128" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="210" name="Constant_8294" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="211" name="Gather_8295" type="Gather" version="opset8">
+			<data batch_dims="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64" />
+				<port id="2" precision="I64" />
+			</input>
+			<output>
+				<port id="3" precision="I64" names="/dec3/Gather_3_output_0" />
+			</output>
+		</layer>
+		<layer id="212" name="/dec3/Sub_1" type="Subtract" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec3/Sub_1_output_0" />
+			</output>
+		</layer>
+		<layer id="213" name="/dec3/Constant_4" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234144" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec3/Constant_4_output_0" />
+			</output>
+		</layer>
+		<layer id="214" name="/dec3/Div" type="Divide" version="opset1">
+			<data auto_broadcast="numpy" m_pythondiv="true" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec3/Cast_1_output_0,/dec3/Cast_output_0,/dec3/Div_output_0" />
+			</output>
+		</layer>
+		<layer id="215" name="Constant_609" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="216" name="/dec3/Unsqueeze_4" type="Unsqueeze" version="opset1">
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec3/Unsqueeze_4_output_0,/dec3/Unsqueeze_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="217" name="/dec3/Sub_2" type="Subtract" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec3/Sub_2_output_0" />
+			</output>
+		</layer>
+		<layer id="218" name="Constant_611" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="219" name="/dec3/Unsqueeze_5" type="Unsqueeze" version="opset1">
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec3/Unsqueeze_1_output_0,/dec3/Unsqueeze_5_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="220" name="Constant_8297" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234144" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="221" name="Constant_8298" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="222" name="Gather_8299" type="Gather" version="opset8">
+			<data batch_dims="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64" />
+				<port id="2" precision="I64" />
+			</input>
+			<output>
+				<port id="3" precision="I64" names="/dec3/Gather_output_0" />
+			</output>
+		</layer>
+		<layer id="223" name="Constant_8301" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234144" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="224" name="Constant_8302" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="225" name="Gather_8303" type="Gather" version="opset8">
+			<data batch_dims="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64" />
+				<port id="2" precision="I64" />
+			</input>
+			<output>
+				<port id="3" precision="I64" names="/dec3/Gather_1_output_0" />
+			</output>
+		</layer>
+		<layer id="226" name="/dec3/Sub" type="Subtract" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec3/Sub_output_0" />
+			</output>
+		</layer>
+		<layer id="227" name="/dec3/Constant_5" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234144" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec3/Constant_5_output_0" />
+			</output>
+		</layer>
+		<layer id="228" name="/dec3/Div_1" type="Divide" version="opset1">
+			<data auto_broadcast="numpy" m_pythondiv="true" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec3/Cast_2_output_0,/dec3/Cast_3_output_0,/dec3/Div_1_output_0" />
+			</output>
+		</layer>
+		<layer id="229" name="Constant_613" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="230" name="/dec3/Unsqueeze_6" type="Unsqueeze" version="opset1">
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec3/Unsqueeze_2_output_0,/dec3/Unsqueeze_6_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="231" name="/dec3/Sub_3" type="Subtract" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec3/Sub_3_output_0" />
+			</output>
+		</layer>
+		<layer id="232" name="Constant_615" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="233" name="/dec3/Unsqueeze_7" type="Unsqueeze" version="opset1">
+			<input>
+				<port id="0" precision="I64" />
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec3/Unsqueeze_3_output_0,/dec3/Unsqueeze_7_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="234" name="/dec3/Concat_1" type="Concat" version="opset1">
+			<data axis="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="2" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="3" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="4" precision="I64" names="/dec3/Cast_4_output_0,/dec3/Concat_1_output_0,/dec3/Concat_output_0">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="235" name="/dec3/ConstantOfShape" type="Const" version="opset1">
+			<data element_type="i64" shape="4" offset="234152" size="32" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec3/ConstantOfShape_output_0">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="236" name="/dec3/Concat_2" type="Concat" version="opset1">
+			<data axis="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>4</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec3/Concat_2_output_0">
+					<dim>8</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="237" name="/dec3/Constant_8" type="Const" version="opset1">
+			<data element_type="i64" shape="2" offset="234184" size="16" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec3/Constant_8_output_0">
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="238" name="/dec3/Reshape" type="Reshape" version="opset1">
+			<data special_zero="true" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>8</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>2</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec3/Reshape_output_0">
+					<dim>4</dim>
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="239" name="/dec3/Constant_10" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234200" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec3/Constant_10_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="240" name="/dec3/Constant_11" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234208" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec3/Constant_11_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="241" name="/dec3/Constant_12" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234200" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec3/Constant_12_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="242" name="/dec3/Constant_9" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/dec3/Constant_9_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="243" name="/dec3/Slice" type="Slice" version="opset8">
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+					<dim>2</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="2" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="3" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="4" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="5" precision="I64" names="/dec3/Slice_output_0">
+					<dim>4</dim>
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="244" name="Constant_638" type="Const" version="opset1">
+			<data element_type="i64" shape="2" offset="234216" size="16" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="245" name="/dec3/Transpose" type="Transpose" version="opset1">
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+					<dim>2</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>2</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec3/Transpose_output_0">
+					<dim>2</dim>
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="246" name="Constant_1569" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234200" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="247" name="/dec3/Reshape_1" type="Reshape" version="opset1">
+			<data special_zero="true" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>2</dim>
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/dec3/Cast_5_output_0,/dec3/Reshape_1_output_0">
+					<dim>8</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="248" name="Constant_645" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="249" name="Split_646" type="Split" version="opset1">
+			<data num_splits="2" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>8</dim>
+				</port>
+				<port id="1" precision="I64" />
+			</input>
+			<output>
+				<port id="2" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="3" precision="I64">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="250" name="Constant_644_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="" offset="234232" size="2" />
+			<output>
+				<port id="0" precision="FP16" />
+			</output>
+		</layer>
+		<layer id="251" name="Constant_644" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16" />
+			</input>
+			<output>
+				<port id="1" precision="FP32" />
+			</output>
+		</layer>
+		<layer id="252" name="/dec3/Pad" type="Pad" version="opset12">
+			<data pad_mode="constant" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="2" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="3" precision="FP32" />
+			</input>
+			<output>
+				<port id="4" precision="FP32" names="/dec3/Pad_output_0">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="253" name="/dec3/Concat_3" type="Concat" version="opset1">
+			<data axis="1" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/dec3/Concat_3_output_0">
+					<dim>-1</dim>
+					<dim>48</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="254" name="onnx::Conv_352_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="24, 48, 3, 3" offset="392714" size="20736" />
+			<output>
+				<port id="0" precision="FP16" names="onnx::Conv_352">
+					<dim>24</dim>
+					<dim>48</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="255" name="onnx::Conv_352" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>24</dim>
+					<dim>48</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>24</dim>
+					<dim>48</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="256" name="/dec3/double_conv/double_conv/double_conv.0/Conv/WithoutBiases" type="Convolution" version="opset1">
+			<data strides="1, 1" dilations="1, 1" pads_begin="1, 1" pads_end="1, 1" auto_pad="explicit" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>48</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>24</dim>
+					<dim>48</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="257" name="Reshape_760_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="1, 24, 1, 1" offset="413450" size="48" />
+			<output>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="258" name="Reshape_760" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="259" name="/dec3/double_conv/double_conv/double_conv.0/Conv" type="Add" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/dec3/double_conv/double_conv/double_conv.0/Conv_output_0">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="260" name="/dec3/double_conv/double_conv/double_conv.2/Relu" type="ReLU" version="opset1">
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32" names="/dec3/double_conv/double_conv/double_conv.2/Relu_output_0">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="261" name="onnx::Conv_355_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="24, 24, 3, 3" offset="413498" size="10368" />
+			<output>
+				<port id="0" precision="FP16" names="onnx::Conv_355">
+					<dim>24</dim>
+					<dim>24</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="262" name="onnx::Conv_355" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>24</dim>
+					<dim>24</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>24</dim>
+					<dim>24</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="263" name="/dec3/double_conv/double_conv/double_conv.3/Conv/WithoutBiases" type="Convolution" version="opset1">
+			<data strides="1, 1" dilations="1, 1" pads_begin="1, 1" pads_end="1, 1" auto_pad="explicit" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>24</dim>
+					<dim>24</dim>
+					<dim>3</dim>
+					<dim>3</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="264" name="Reshape_774_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="1, 24, 1, 1" offset="423866" size="48" />
+			<output>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="265" name="Reshape_774" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="266" name="/dec3/double_conv/double_conv/double_conv.3/Conv" type="Add" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/dec3/double_conv/double_conv/double_conv.3/Conv_output_0">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="267" name="/dec3/double_conv/double_conv/double_conv.5/Relu" type="ReLU" version="opset1">
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32" names="/dec3/double_conv/double_conv/double_conv.5/Relu_output_0">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="268" name="outc.conv.weight_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="4, 24, 1, 1" offset="423914" size="192" />
+			<output>
+				<port id="0" precision="FP16" names="outc.conv.weight">
+					<dim>4</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="269" name="outc.conv.weight" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>4</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>4</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="270" name="/outc/conv/Conv/WithoutBiases" type="Convolution" version="opset1">
+			<data strides="1, 1" dilations="1, 1" pads_begin="0, 0" pads_end="0, 0" auto_pad="explicit" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>24</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>4</dim>
+					<dim>24</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32">
+					<dim>-1</dim>
+					<dim>4</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="271" name="Reshape_788_compressed" type="Const" version="opset1">
+			<data element_type="f16" shape="1, 4, 1, 1" offset="424106" size="8" />
+			<output>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>4</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="272" name="Reshape_788" type="Convert" version="opset1">
+			<data destination_type="f32" />
+			<rt_info>
+				<attribute name="decompression" version="0" />
+			</rt_info>
+			<input>
+				<port id="0" precision="FP16">
+					<dim>1</dim>
+					<dim>4</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>4</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="273" name="/outc/conv/Conv" type="Add" version="opset1">
+			<data auto_broadcast="numpy" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>4</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+				<port id="1" precision="FP32">
+					<dim>1</dim>
+					<dim>4</dim>
+					<dim>1</dim>
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="/outc/conv/Conv_output_0">
+					<dim>-1</dim>
+					<dim>4</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="274" name="/Shape_2" type="ShapeOf" version="opset3">
+			<data output_type="i64" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>4</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="I64" names="/Shape_2_output_0">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="275" name="/Constant_3" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/Constant_3_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="276" name="/Constant_4" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234144" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/Constant_4_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="277" name="Broadcast_801" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="424114" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="278" name="/Constant_2" type="Const" version="opset1">
+			<data element_type="i64" shape="1" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" names="/Constant_2_output_0">
+					<dim>1</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="279" name="/Slice" type="Slice" version="opset8">
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="2" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="3" precision="I64">
+					<dim>1</dim>
+				</port>
+				<port id="4" precision="I64">
+					<dim>1</dim>
+				</port>
+			</input>
+			<output>
+				<port id="5" precision="I64" names="/Slice_output_0">
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="280" name="/Shape" type="ShapeOf" version="opset3">
+			<data output_type="i64" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>1</dim>
+					<dim>1792</dim>
+					<dim>1792</dim>
+				</port>
+			</input>
+			<output>
+				<port id="1" precision="I64" names="/Shape_1_output_0,/Shape_output_0">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="281" name="Constant_5960" type="Const" version="opset1">
+			<data element_type="i64" shape="2" offset="424122" size="16" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64">
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="282" name="Constant_5961" type="Const" version="opset1">
+			<data element_type="i64" shape="" offset="234136" size="8" />
+			<rt_info>
+				<attribute name="precise" version="0" />
+			</rt_info>
+			<output>
+				<port id="0" precision="I64" />
+			</output>
+		</layer>
+		<layer id="283" name="Gather_5962" type="Gather" version="opset8">
+			<data batch_dims="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>4</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>2</dim>
+				</port>
+				<port id="2" precision="I64" />
+			</input>
+			<output>
+				<port id="3" precision="I64" names="/Cast_output_0,/Concat_output_0">
+					<dim>2</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="284" name="/Concat_1" type="Concat" version="opset1">
+			<data axis="0" />
+			<input>
+				<port id="0" precision="I64">
+					<dim>2</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>2</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="I64" names="/Concat_1_output_0">
+					<dim>4</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="285" name="output" type="Interpolate" version="opset11">
+			<data mode="linear_onnx" shape_calculation_mode="sizes" coordinate_transformation_mode="half_pixel" nearest_mode="floor" antialias="false" pads_begin="0, 0, 0, 0" pads_end="0, 0, 0, 0" cube_coeff="-0.75" />
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>4</dim>
+					<dim>896</dim>
+					<dim>896</dim>
+				</port>
+				<port id="1" precision="I64">
+					<dim>4</dim>
+				</port>
+			</input>
+			<output>
+				<port id="2" precision="FP32" names="output">
+					<dim>-1</dim>
+					<dim>4</dim>
+					<dim>1792</dim>
+					<dim>1792</dim>
+				</port>
+			</output>
+		</layer>
+		<layer id="286" name="output/sink_port_0" type="Result" version="opset1">
+			<input>
+				<port id="0" precision="FP32">
+					<dim>-1</dim>
+					<dim>4</dim>
+					<dim>1792</dim>
+					<dim>1792</dim>
+				</port>
+			</input>
+		</layer>
+	</layers>
+	<edges>
+		<edge from-layer="0" from-port="0" to-layer="3" to-port="0" />
+		<edge from-layer="0" from-port="0" to-layer="280" to-port="0" />
+		<edge from-layer="1" from-port="0" to-layer="2" to-port="0" />
+		<edge from-layer="2" from-port="1" to-layer="3" to-port="1" />
+		<edge from-layer="3" from-port="2" to-layer="6" to-port="0" />
+		<edge from-layer="4" from-port="0" to-layer="5" to-port="0" />
+		<edge from-layer="5" from-port="1" to-layer="6" to-port="1" />
+		<edge from-layer="6" from-port="2" to-layer="9" to-port="0" />
+		<edge from-layer="6" from-port="2" to-layer="253" to-port="0" />
+		<edge from-layer="6" from-port="2" to-layer="204" to-port="0" />
+		<edge from-layer="7" from-port="0" to-layer="8" to-port="0" />
+		<edge from-layer="8" from-port="1" to-layer="9" to-port="1" />
+		<edge from-layer="9" from-port="2" to-layer="12" to-port="0" />
+		<edge from-layer="10" from-port="0" to-layer="11" to-port="0" />
+		<edge from-layer="11" from-port="1" to-layer="12" to-port="1" />
+		<edge from-layer="12" from-port="2" to-layer="15" to-port="0" />
+		<edge from-layer="13" from-port="0" to-layer="14" to-port="0" />
+		<edge from-layer="14" from-port="1" to-layer="15" to-port="1" />
+		<edge from-layer="15" from-port="2" to-layer="16" to-port="0" />
+		<edge from-layer="16" from-port="1" to-layer="19" to-port="0" />
+		<edge from-layer="17" from-port="0" to-layer="18" to-port="0" />
+		<edge from-layer="18" from-port="1" to-layer="19" to-port="1" />
+		<edge from-layer="19" from-port="2" to-layer="22" to-port="0" />
+		<edge from-layer="20" from-port="0" to-layer="21" to-port="0" />
+		<edge from-layer="21" from-port="1" to-layer="22" to-port="1" />
+		<edge from-layer="22" from-port="2" to-layer="23" to-port="0" />
+		<edge from-layer="23" from-port="1" to-layer="183" to-port="0" />
+		<edge from-layer="23" from-port="1" to-layer="26" to-port="0" />
+		<edge from-layer="23" from-port="1" to-layer="134" to-port="0" />
+		<edge from-layer="24" from-port="0" to-layer="25" to-port="0" />
+		<edge from-layer="25" from-port="1" to-layer="26" to-port="1" />
+		<edge from-layer="26" from-port="2" to-layer="29" to-port="0" />
+		<edge from-layer="27" from-port="0" to-layer="28" to-port="0" />
+		<edge from-layer="28" from-port="1" to-layer="29" to-port="1" />
+		<edge from-layer="29" from-port="2" to-layer="32" to-port="0" />
+		<edge from-layer="30" from-port="0" to-layer="31" to-port="0" />
+		<edge from-layer="31" from-port="1" to-layer="32" to-port="1" />
+		<edge from-layer="32" from-port="2" to-layer="33" to-port="0" />
+		<edge from-layer="33" from-port="1" to-layer="36" to-port="0" />
+		<edge from-layer="34" from-port="0" to-layer="35" to-port="0" />
+		<edge from-layer="35" from-port="1" to-layer="36" to-port="1" />
+		<edge from-layer="36" from-port="2" to-layer="39" to-port="0" />
+		<edge from-layer="37" from-port="0" to-layer="38" to-port="0" />
+		<edge from-layer="38" from-port="1" to-layer="39" to-port="1" />
+		<edge from-layer="39" from-port="2" to-layer="40" to-port="0" />
+		<edge from-layer="40" from-port="1" to-layer="43" to-port="0" />
+		<edge from-layer="40" from-port="1" to-layer="64" to-port="0" />
+		<edge from-layer="40" from-port="1" to-layer="113" to-port="0" />
+		<edge from-layer="41" from-port="0" to-layer="42" to-port="0" />
+		<edge from-layer="42" from-port="1" to-layer="43" to-port="1" />
+		<edge from-layer="43" from-port="2" to-layer="46" to-port="0" />
+		<edge from-layer="44" from-port="0" to-layer="45" to-port="0" />
+		<edge from-layer="45" from-port="1" to-layer="46" to-port="1" />
+		<edge from-layer="46" from-port="2" to-layer="49" to-port="0" />
+		<edge from-layer="47" from-port="0" to-layer="48" to-port="0" />
+		<edge from-layer="48" from-port="1" to-layer="49" to-port="1" />
+		<edge from-layer="49" from-port="2" to-layer="50" to-port="0" />
+		<edge from-layer="50" from-port="1" to-layer="53" to-port="0" />
+		<edge from-layer="51" from-port="0" to-layer="52" to-port="0" />
+		<edge from-layer="52" from-port="1" to-layer="53" to-port="1" />
+		<edge from-layer="53" from-port="2" to-layer="56" to-port="0" />
+		<edge from-layer="54" from-port="0" to-layer="55" to-port="0" />
+		<edge from-layer="55" from-port="1" to-layer="56" to-port="1" />
+		<edge from-layer="56" from-port="2" to-layer="57" to-port="0" />
+		<edge from-layer="57" from-port="1" to-layer="60" to-port="0" />
+		<edge from-layer="58" from-port="0" to-layer="59" to-port="0" />
+		<edge from-layer="59" from-port="1" to-layer="60" to-port="1" />
+		<edge from-layer="60" from-port="2" to-layer="63" to-port="0" />
+		<edge from-layer="61" from-port="0" to-layer="62" to-port="0" />
+		<edge from-layer="62" from-port="1" to-layer="63" to-port="1" />
+		<edge from-layer="63" from-port="2" to-layer="68" to-port="0" />
+		<edge from-layer="63" from-port="2" to-layer="112" to-port="0" />
+		<edge from-layer="64" from-port="1" to-layer="67" to-port="0" />
+		<edge from-layer="64" from-port="1" to-layer="82" to-port="0" />
+		<edge from-layer="65" from-port="0" to-layer="67" to-port="1" />
+		<edge from-layer="66" from-port="0" to-layer="67" to-port="2" />
+		<edge from-layer="67" from-port="3" to-layer="72" to-port="0" />
+		<edge from-layer="68" from-port="1" to-layer="85" to-port="0" />
+		<edge from-layer="68" from-port="1" to-layer="71" to-port="0" />
+		<edge from-layer="69" from-port="0" to-layer="71" to-port="1" />
+		<edge from-layer="70" from-port="0" to-layer="71" to-port="2" />
+		<edge from-layer="71" from-port="3" to-layer="72" to-port="1" />
+		<edge from-layer="72" from-port="2" to-layer="74" to-port="0" />
+		<edge from-layer="72" from-port="2" to-layer="77" to-port="0" />
+		<edge from-layer="73" from-port="0" to-layer="74" to-port="1" />
+		<edge from-layer="74" from-port="2" to-layer="77" to-port="1" />
+		<edge from-layer="74" from-port="2" to-layer="76" to-port="0" />
+		<edge from-layer="75" from-port="0" to-layer="76" to-port="1" />
+		<edge from-layer="76" from-port="2" to-layer="94" to-port="0" />
+		<edge from-layer="77" from-port="2" to-layer="79" to-port="0" />
+		<edge from-layer="78" from-port="0" to-layer="79" to-port="1" />
+		<edge from-layer="79" from-port="2" to-layer="94" to-port="1" />
+		<edge from-layer="80" from-port="0" to-layer="82" to-port="1" />
+		<edge from-layer="81" from-port="0" to-layer="82" to-port="2" />
+		<edge from-layer="82" from-port="3" to-layer="86" to-port="0" />
+		<edge from-layer="83" from-port="0" to-layer="85" to-port="1" />
+		<edge from-layer="84" from-port="0" to-layer="85" to-port="2" />
+		<edge from-layer="85" from-port="3" to-layer="86" to-port="1" />
+		<edge from-layer="86" from-port="2" to-layer="91" to-port="0" />
+		<edge from-layer="86" from-port="2" to-layer="88" to-port="0" />
+		<edge from-layer="87" from-port="0" to-layer="88" to-port="1" />
+		<edge from-layer="88" from-port="2" to-layer="90" to-port="0" />
+		<edge from-layer="88" from-port="2" to-layer="91" to-port="1" />
+		<edge from-layer="89" from-port="0" to-layer="90" to-port="1" />
+		<edge from-layer="90" from-port="2" to-layer="94" to-port="2" />
+		<edge from-layer="91" from-port="2" to-layer="93" to-port="0" />
+		<edge from-layer="92" from-port="0" to-layer="93" to-port="1" />
+		<edge from-layer="93" from-port="2" to-layer="94" to-port="3" />
+		<edge from-layer="94" from-port="4" to-layer="96" to-port="0" />
+		<edge from-layer="95" from-port="0" to-layer="96" to-port="1" />
+		<edge from-layer="96" from-port="2" to-layer="98" to-port="0" />
+		<edge from-layer="97" from-port="0" to-layer="98" to-port="1" />
+		<edge from-layer="98" from-port="2" to-layer="103" to-port="0" />
+		<edge from-layer="99" from-port="0" to-layer="103" to-port="1" />
+		<edge from-layer="100" from-port="0" to-layer="103" to-port="2" />
+		<edge from-layer="101" from-port="0" to-layer="103" to-port="3" />
+		<edge from-layer="102" from-port="0" to-layer="103" to-port="4" />
+		<edge from-layer="103" from-port="5" to-layer="105" to-port="0" />
+		<edge from-layer="104" from-port="0" to-layer="105" to-port="1" />
+		<edge from-layer="105" from-port="2" to-layer="107" to-port="0" />
+		<edge from-layer="106" from-port="0" to-layer="107" to-port="1" />
+		<edge from-layer="107" from-port="2" to-layer="109" to-port="0" />
+		<edge from-layer="108" from-port="0" to-layer="109" to-port="1" />
+		<edge from-layer="109" from-port="2" to-layer="112" to-port="1" />
+		<edge from-layer="109" from-port="3" to-layer="112" to-port="2" />
+		<edge from-layer="110" from-port="0" to-layer="111" to-port="0" />
+		<edge from-layer="111" from-port="1" to-layer="112" to-port="3" />
+		<edge from-layer="112" from-port="4" to-layer="113" to-port="1" />
+		<edge from-layer="113" from-port="2" to-layer="116" to-port="0" />
+		<edge from-layer="114" from-port="0" to-layer="115" to-port="0" />
+		<edge from-layer="115" from-port="1" to-layer="116" to-port="1" />
+		<edge from-layer="116" from-port="2" to-layer="119" to-port="0" />
+		<edge from-layer="117" from-port="0" to-layer="118" to-port="0" />
+		<edge from-layer="118" from-port="1" to-layer="119" to-port="1" />
+		<edge from-layer="119" from-port="2" to-layer="120" to-port="0" />
+		<edge from-layer="120" from-port="1" to-layer="123" to-port="0" />
+		<edge from-layer="121" from-port="0" to-layer="122" to-port="0" />
+		<edge from-layer="122" from-port="1" to-layer="123" to-port="1" />
+		<edge from-layer="123" from-port="2" to-layer="126" to-port="0" />
+		<edge from-layer="124" from-port="0" to-layer="125" to-port="0" />
+		<edge from-layer="125" from-port="1" to-layer="126" to-port="1" />
+		<edge from-layer="126" from-port="2" to-layer="127" to-port="0" />
+		<edge from-layer="127" from-port="1" to-layer="130" to-port="0" />
+		<edge from-layer="128" from-port="0" to-layer="129" to-port="0" />
+		<edge from-layer="129" from-port="1" to-layer="130" to-port="1" />
+		<edge from-layer="130" from-port="2" to-layer="133" to-port="0" />
+		<edge from-layer="131" from-port="0" to-layer="132" to-port="0" />
+		<edge from-layer="132" from-port="1" to-layer="133" to-port="1" />
+		<edge from-layer="133" from-port="2" to-layer="138" to-port="0" />
+		<edge from-layer="133" from-port="2" to-layer="182" to-port="0" />
+		<edge from-layer="134" from-port="1" to-layer="152" to-port="0" />
+		<edge from-layer="134" from-port="1" to-layer="137" to-port="0" />
+		<edge from-layer="135" from-port="0" to-layer="137" to-port="1" />
+		<edge from-layer="136" from-port="0" to-layer="137" to-port="2" />
+		<edge from-layer="137" from-port="3" to-layer="142" to-port="0" />
+		<edge from-layer="138" from-port="1" to-layer="141" to-port="0" />
+		<edge from-layer="138" from-port="1" to-layer="155" to-port="0" />
+		<edge from-layer="139" from-port="0" to-layer="141" to-port="1" />
+		<edge from-layer="140" from-port="0" to-layer="141" to-port="2" />
+		<edge from-layer="141" from-port="3" to-layer="142" to-port="1" />
+		<edge from-layer="142" from-port="2" to-layer="147" to-port="0" />
+		<edge from-layer="142" from-port="2" to-layer="144" to-port="0" />
+		<edge from-layer="143" from-port="0" to-layer="144" to-port="1" />
+		<edge from-layer="144" from-port="2" to-layer="147" to-port="1" />
+		<edge from-layer="144" from-port="2" to-layer="146" to-port="0" />
+		<edge from-layer="145" from-port="0" to-layer="146" to-port="1" />
+		<edge from-layer="146" from-port="2" to-layer="164" to-port="0" />
+		<edge from-layer="147" from-port="2" to-layer="149" to-port="0" />
+		<edge from-layer="148" from-port="0" to-layer="149" to-port="1" />
+		<edge from-layer="149" from-port="2" to-layer="164" to-port="1" />
+		<edge from-layer="150" from-port="0" to-layer="152" to-port="1" />
+		<edge from-layer="151" from-port="0" to-layer="152" to-port="2" />
+		<edge from-layer="152" from-port="3" to-layer="156" to-port="0" />
+		<edge from-layer="153" from-port="0" to-layer="155" to-port="1" />
+		<edge from-layer="154" from-port="0" to-layer="155" to-port="2" />
+		<edge from-layer="155" from-port="3" to-layer="156" to-port="1" />
+		<edge from-layer="156" from-port="2" to-layer="158" to-port="0" />
+		<edge from-layer="156" from-port="2" to-layer="161" to-port="0" />
+		<edge from-layer="157" from-port="0" to-layer="158" to-port="1" />
+		<edge from-layer="158" from-port="2" to-layer="160" to-port="0" />
+		<edge from-layer="158" from-port="2" to-layer="161" to-port="1" />
+		<edge from-layer="159" from-port="0" to-layer="160" to-port="1" />
+		<edge from-layer="160" from-port="2" to-layer="164" to-port="2" />
+		<edge from-layer="161" from-port="2" to-layer="163" to-port="0" />
+		<edge from-layer="162" from-port="0" to-layer="163" to-port="1" />
+		<edge from-layer="163" from-port="2" to-layer="164" to-port="3" />
+		<edge from-layer="164" from-port="4" to-layer="166" to-port="0" />
+		<edge from-layer="165" from-port="0" to-layer="166" to-port="1" />
+		<edge from-layer="166" from-port="2" to-layer="168" to-port="0" />
+		<edge from-layer="167" from-port="0" to-layer="168" to-port="1" />
+		<edge from-layer="168" from-port="2" to-layer="173" to-port="0" />
+		<edge from-layer="169" from-port="0" to-layer="173" to-port="1" />
+		<edge from-layer="170" from-port="0" to-layer="173" to-port="2" />
+		<edge from-layer="171" from-port="0" to-layer="173" to-port="3" />
+		<edge from-layer="172" from-port="0" to-layer="173" to-port="4" />
+		<edge from-layer="173" from-port="5" to-layer="175" to-port="0" />
+		<edge from-layer="174" from-port="0" to-layer="175" to-port="1" />
+		<edge from-layer="175" from-port="2" to-layer="177" to-port="0" />
+		<edge from-layer="176" from-port="0" to-layer="177" to-port="1" />
+		<edge from-layer="177" from-port="2" to-layer="179" to-port="0" />
+		<edge from-layer="178" from-port="0" to-layer="179" to-port="1" />
+		<edge from-layer="179" from-port="3" to-layer="182" to-port="2" />
+		<edge from-layer="179" from-port="2" to-layer="182" to-port="1" />
+		<edge from-layer="180" from-port="0" to-layer="181" to-port="0" />
+		<edge from-layer="181" from-port="1" to-layer="182" to-port="3" />
+		<edge from-layer="182" from-port="4" to-layer="183" to-port="1" />
+		<edge from-layer="183" from-port="2" to-layer="186" to-port="0" />
+		<edge from-layer="184" from-port="0" to-layer="185" to-port="0" />
+		<edge from-layer="185" from-port="1" to-layer="186" to-port="1" />
+		<edge from-layer="186" from-port="2" to-layer="189" to-port="0" />
+		<edge from-layer="187" from-port="0" to-layer="188" to-port="0" />
+		<edge from-layer="188" from-port="1" to-layer="189" to-port="1" />
+		<edge from-layer="189" from-port="2" to-layer="190" to-port="0" />
+		<edge from-layer="190" from-port="1" to-layer="193" to-port="0" />
+		<edge from-layer="191" from-port="0" to-layer="192" to-port="0" />
+		<edge from-layer="192" from-port="1" to-layer="193" to-port="1" />
+		<edge from-layer="193" from-port="2" to-layer="196" to-port="0" />
+		<edge from-layer="194" from-port="0" to-layer="195" to-port="0" />
+		<edge from-layer="195" from-port="1" to-layer="196" to-port="1" />
+		<edge from-layer="196" from-port="2" to-layer="197" to-port="0" />
+		<edge from-layer="197" from-port="1" to-layer="200" to-port="0" />
+		<edge from-layer="198" from-port="0" to-layer="199" to-port="0" />
+		<edge from-layer="199" from-port="1" to-layer="200" to-port="1" />
+		<edge from-layer="200" from-port="2" to-layer="203" to-port="0" />
+		<edge from-layer="201" from-port="0" to-layer="202" to-port="0" />
+		<edge from-layer="202" from-port="1" to-layer="203" to-port="1" />
+		<edge from-layer="203" from-port="2" to-layer="208" to-port="0" />
+		<edge from-layer="203" from-port="2" to-layer="252" to-port="0" />
+		<edge from-layer="204" from-port="1" to-layer="207" to-port="0" />
+		<edge from-layer="204" from-port="1" to-layer="222" to-port="0" />
+		<edge from-layer="205" from-port="0" to-layer="207" to-port="1" />
+		<edge from-layer="206" from-port="0" to-layer="207" to-port="2" />
+		<edge from-layer="207" from-port="3" to-layer="212" to-port="0" />
+		<edge from-layer="208" from-port="1" to-layer="211" to-port="0" />
+		<edge from-layer="208" from-port="1" to-layer="225" to-port="0" />
+		<edge from-layer="209" from-port="0" to-layer="211" to-port="1" />
+		<edge from-layer="210" from-port="0" to-layer="211" to-port="2" />
+		<edge from-layer="211" from-port="3" to-layer="212" to-port="1" />
+		<edge from-layer="212" from-port="2" to-layer="214" to-port="0" />
+		<edge from-layer="212" from-port="2" to-layer="217" to-port="0" />
+		<edge from-layer="213" from-port="0" to-layer="214" to-port="1" />
+		<edge from-layer="214" from-port="2" to-layer="217" to-port="1" />
+		<edge from-layer="214" from-port="2" to-layer="216" to-port="0" />
+		<edge from-layer="215" from-port="0" to-layer="216" to-port="1" />
+		<edge from-layer="216" from-port="2" to-layer="234" to-port="0" />
+		<edge from-layer="217" from-port="2" to-layer="219" to-port="0" />
+		<edge from-layer="218" from-port="0" to-layer="219" to-port="1" />
+		<edge from-layer="219" from-port="2" to-layer="234" to-port="1" />
+		<edge from-layer="220" from-port="0" to-layer="222" to-port="1" />
+		<edge from-layer="221" from-port="0" to-layer="222" to-port="2" />
+		<edge from-layer="222" from-port="3" to-layer="226" to-port="0" />
+		<edge from-layer="223" from-port="0" to-layer="225" to-port="1" />
+		<edge from-layer="224" from-port="0" to-layer="225" to-port="2" />
+		<edge from-layer="225" from-port="3" to-layer="226" to-port="1" />
+		<edge from-layer="226" from-port="2" to-layer="231" to-port="0" />
+		<edge from-layer="226" from-port="2" to-layer="228" to-port="0" />
+		<edge from-layer="227" from-port="0" to-layer="228" to-port="1" />
+		<edge from-layer="228" from-port="2" to-layer="230" to-port="0" />
+		<edge from-layer="228" from-port="2" to-layer="231" to-port="1" />
+		<edge from-layer="229" from-port="0" to-layer="230" to-port="1" />
+		<edge from-layer="230" from-port="2" to-layer="234" to-port="2" />
+		<edge from-layer="231" from-port="2" to-layer="233" to-port="0" />
+		<edge from-layer="232" from-port="0" to-layer="233" to-port="1" />
+		<edge from-layer="233" from-port="2" to-layer="234" to-port="3" />
+		<edge from-layer="234" from-port="4" to-layer="236" to-port="0" />
+		<edge from-layer="235" from-port="0" to-layer="236" to-port="1" />
+		<edge from-layer="236" from-port="2" to-layer="238" to-port="0" />
+		<edge from-layer="237" from-port="0" to-layer="238" to-port="1" />
+		<edge from-layer="238" from-port="2" to-layer="243" to-port="0" />
+		<edge from-layer="239" from-port="0" to-layer="243" to-port="1" />
+		<edge from-layer="240" from-port="0" to-layer="243" to-port="2" />
+		<edge from-layer="241" from-port="0" to-layer="243" to-port="3" />
+		<edge from-layer="242" from-port="0" to-layer="243" to-port="4" />
+		<edge from-layer="243" from-port="5" to-layer="245" to-port="0" />
+		<edge from-layer="244" from-port="0" to-layer="245" to-port="1" />
+		<edge from-layer="245" from-port="2" to-layer="247" to-port="0" />
+		<edge from-layer="246" from-port="0" to-layer="247" to-port="1" />
+		<edge from-layer="247" from-port="2" to-layer="249" to-port="0" />
+		<edge from-layer="248" from-port="0" to-layer="249" to-port="1" />
+		<edge from-layer="249" from-port="2" to-layer="252" to-port="1" />
+		<edge from-layer="249" from-port="3" to-layer="252" to-port="2" />
+		<edge from-layer="250" from-port="0" to-layer="251" to-port="0" />
+		<edge from-layer="251" from-port="1" to-layer="252" to-port="3" />
+		<edge from-layer="252" from-port="4" to-layer="253" to-port="1" />
+		<edge from-layer="253" from-port="2" to-layer="256" to-port="0" />
+		<edge from-layer="254" from-port="0" to-layer="255" to-port="0" />
+		<edge from-layer="255" from-port="1" to-layer="256" to-port="1" />
+		<edge from-layer="256" from-port="2" to-layer="259" to-port="0" />
+		<edge from-layer="257" from-port="0" to-layer="258" to-port="0" />
+		<edge from-layer="258" from-port="1" to-layer="259" to-port="1" />
+		<edge from-layer="259" from-port="2" to-layer="260" to-port="0" />
+		<edge from-layer="260" from-port="1" to-layer="263" to-port="0" />
+		<edge from-layer="261" from-port="0" to-layer="262" to-port="0" />
+		<edge from-layer="262" from-port="1" to-layer="263" to-port="1" />
+		<edge from-layer="263" from-port="2" to-layer="266" to-port="0" />
+		<edge from-layer="264" from-port="0" to-layer="265" to-port="0" />
+		<edge from-layer="265" from-port="1" to-layer="266" to-port="1" />
+		<edge from-layer="266" from-port="2" to-layer="267" to-port="0" />
+		<edge from-layer="267" from-port="1" to-layer="270" to-port="0" />
+		<edge from-layer="268" from-port="0" to-layer="269" to-port="0" />
+		<edge from-layer="269" from-port="1" to-layer="270" to-port="1" />
+		<edge from-layer="270" from-port="2" to-layer="273" to-port="0" />
+		<edge from-layer="271" from-port="0" to-layer="272" to-port="0" />
+		<edge from-layer="272" from-port="1" to-layer="273" to-port="1" />
+		<edge from-layer="273" from-port="2" to-layer="274" to-port="0" />
+		<edge from-layer="273" from-port="2" to-layer="285" to-port="0" />
+		<edge from-layer="274" from-port="1" to-layer="279" to-port="0" />
+		<edge from-layer="275" from-port="0" to-layer="279" to-port="1" />
+		<edge from-layer="276" from-port="0" to-layer="279" to-port="2" />
+		<edge from-layer="277" from-port="0" to-layer="279" to-port="3" />
+		<edge from-layer="278" from-port="0" to-layer="279" to-port="4" />
+		<edge from-layer="279" from-port="5" to-layer="284" to-port="0" />
+		<edge from-layer="280" from-port="1" to-layer="283" to-port="0" />
+		<edge from-layer="281" from-port="0" to-layer="283" to-port="1" />
+		<edge from-layer="282" from-port="0" to-layer="283" to-port="2" />
+		<edge from-layer="283" from-port="3" to-layer="284" to-port="1" />
+		<edge from-layer="284" from-port="2" to-layer="285" to-port="1" />
+		<edge from-layer="285" from-port="2" to-layer="286" to-port="0" />
+	</edges>
+	<rt_info>
+		<Runtime_version value="2024.6.0-17404-4c0f47d2335-releases/2024/6" />
+		<conversion_parameters>
+			<input_model value="DIR/model.onnx" />
+			<is_python_object value="False" />
+		</conversion_parameters>
+	</rt_info>
+</net>

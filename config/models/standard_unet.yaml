@@ -1,0 +1,29 @@
+# config/standard_unet.yaml
+architecture:
+  bilinear: false
+  
+  initial:
+    out_channels: 64
+    dilation: false
+  
+  encoder:
+    - out_channels: 128
+      dilation: false
+    - out_channels: 256
+      dilation: false
+    - out_channels: 512
+      dilation: false
+    - out_channels: 1024
+      dilation: false
+  
+  decoder:
+    - out_channels: 512
+      dilation: false
+    - out_channels: 256
+      dilation: false
+    - out_channels: 128
+      dilation: false
+    - out_channels: 64
+      dilation: false
+  
+  output: {}

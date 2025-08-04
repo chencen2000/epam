@@ -33,8 +33,9 @@ The [**src**](https://github.com/chencen2000/epam/tree/develop) folder contains 
 - **Visualization** ([visualization.py](https://github.com/chencen2000/epam/blob/main/src/visualization.py)): Offers tools to visualize various stages of the image processing and mask creation.
 
 ## Model architecture and pre-training process
-Our baseline model inherits the ideas from original [U-net](https://arxiv.org/abs/1505.04597) as proposed by Ronneberger et al. However, it has fewer stages and lower number of channels to meet speed requirements. It utilizes dilated convolitions (x2) at every stage to increase the receptive field of the model. Overall, the model has only a fraction of number of trainable parameters, compared to the original U-net model.
+Our slim model inherits the ideas from original [U-net](https://arxiv.org/abs/1505.04597) as proposed by Ronneberger et al. However, it has fewer stages and lower number of channels to meet speed requirements. It utilizes dilated convolitions (x2) at every stage to increase the receptive field of the model. Overall, the model has only a fraction of number of trainable parameters, compared to the original U-net model.
 
-![UNet-architecture-This-diagram-is-based-on-the-original-UNet-publication-20 (1)](https://github.com/user-attachments/assets/51a568e4-cad1-4820-8e97-e776a8a544cd)
+![UNet-architecture-This-diagram-is-based-on-the-original-UNet-publication-20 (1)](https://github.com/user-attachments/assets/d38f1a8c-9f54-4bf4-b292-041244796a40)
 
-Baseline model architecture diagram. The architecture diagram is preliminary and approximate, serves as an illustration of the approach, the exact number of channels on some of the layers can be different in the training [code](https://github.com/chencen2000/epam/blob/main/src/training.py).
+Slim model architecture diagram. The architecture diagram is preliminary and approximate, serves as an illustration of the approach, the exact number of channels on some of the layers can be different in the training [code](https://github.com/chencen2000/epam/blob/main/src/training.py).
+
