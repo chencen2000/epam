@@ -1,8 +1,8 @@
-from typing import List, Dict, Optional
-
-import numpy as np
-import seaborn as sns
 import matplotlib.pyplot as plt
+import numpy as np
+from typing import List, Dict, Optional
+import seaborn as sns
+from src.target_labels import TargetLabels
 
 
 def plot_training_history(train_losses: List[float], val_losses: List[float],
@@ -12,14 +12,14 @@ def plot_training_history(train_losses: List[float], val_losses: List[float],
     """Enhanced plotting for multi-class segmentation training history"""
     
     if class_names is None:
-        class_names = ['background', 'dirt', 'scratches']
+        class_names = TargetLabels.values()  # ['background', 'condensation', 'dirt','scratch' ]
     
     # Determine number of subplots needed
     num_classes = len(class_names)
     fig = plt.figure(figsize=(20, 12))
     
     # Plot 1: Loss curves
-    ax1 = plt.subplot(3, 3, 1)
+    ax1 = plt.subplot(4, 4, 1)
     ax1.plot(train_losses, label='Train Loss', linewidth=2)
     ax1.plot(val_losses, label='Val Loss', linewidth=2)
     ax1.set_xlabel('Epoch')
@@ -29,7 +29,7 @@ def plot_training_history(train_losses: List[float], val_losses: List[float],
     ax1.grid(True, alpha=0.3)
     
     # Plot 2: Mean IoU
-    ax2 = plt.subplot(3, 3, 2)
+    ax2 = plt.subplot(4, 4, 2)
     if 'mean_iou' in train_metrics:
         ax2.plot(train_metrics['mean_iou'], label='Train mIoU', linewidth=2)
         ax2.plot(val_metrics['mean_iou'], label='Val mIoU', linewidth=2)
@@ -41,7 +41,7 @@ def plot_training_history(train_losses: List[float], val_losses: List[float],
     ax2.set_ylim([0, 1])
     
     # Plot 3: Mean Dice
-    ax3 = plt.subplot(3, 3, 3)
+    ax3 = plt.subplot(4, 4, 3)
     if 'mean_dice' in train_metrics:
         ax3.plot(train_metrics['mean_dice'], label='Train mDice', linewidth=2)
         ax3.plot(val_metrics['mean_dice'], label='Val mDice', linewidth=2)
@@ -52,9 +52,18 @@ def plot_training_history(train_losses: List[float], val_losses: List[float],
     ax3.grid(True, alpha=0.3)
     ax3.set_ylim([0, 1])
     
+    # plot 4: EPoch
+    ax4 = plt.subplot(4, 4, 4)
+    ax4.plot(epoch_times, label='Epoch Time', marker='o', color='brown', linewidth=2    )
+    ax4.set_title('Epoch Training Time', )
+    ax4.set_xlabel('Epoch')
+    ax4.set_ylabel('Time (seconds)')
+    ax4.legend()
+    ax4.grid(True, alpha=0.3)
+    
     # Plot 4-6: Per-class IoU
     for i, class_name in enumerate(class_names):
-        ax = plt.subplot(3, 3, 4 + i)
+        ax = plt.subplot(4, 4, 5 + i)
         key = f'iou_{class_name}'
         if key in train_metrics:
             ax.plot(train_metrics[key], label=f'Train {class_name}', linewidth=2)
@@ -68,7 +77,7 @@ def plot_training_history(train_losses: List[float], val_losses: List[float],
     
     # Plot 7-9: Per-class Dice
     for i, class_name in enumerate(class_names):
-        ax = plt.subplot(3, 3, 7 + i)
+        ax = plt.subplot(4, 4, 9 + i)
         key = f'dice_{class_name}'
         if key in train_metrics:
             ax.plot(train_metrics[key], label=f'Train {class_name}', linewidth=2)
@@ -148,7 +157,7 @@ def visualize_multiclass_predictions(image: np.ndarray, ground_truth: np.ndarray
     """Visualize multi-class segmentation predictions"""
     
     if class_names is None:
-        class_names = ['background', 'dirt', 'scratches']
+        class_names = TargetLabels.values()  #  ['background', 'dirt', 'scratches']
     
     # Define color map
     colors = {
@@ -230,7 +239,7 @@ def create_confusion_matrix(predictions: np.ndarray, ground_truths: np.ndarray,
     """Create and visualize confusion matrix for multi-class segmentation"""
     
     if class_names is None:
-        class_names = ['background', 'dirt', 'scratches']
+        class_names = TargetLabels.values()  #  ['background', 'dirt', 'scratches']
     
     num_classes = len(class_names)
     
