@@ -38,3 +38,4 @@ Our slim model inherits the ideas from original [U-net](https://arxiv.org/abs/15
 ![UNet-architecture-This-diagram-is-based-on-the-original-UNet-publication-20 (1)](https://github.com/user-attachments/assets/d38f1a8c-9f54-4bf4-b292-041244796a40)
 
 Slim model architecture diagram. The architecture diagram is preliminary and approximate, serves as an illustration of the approach, the exact number of channels on some of the layers can be different in the training [code](https://github.com/chencen2000/epam/blob/main/src/training.py).
+
