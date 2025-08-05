@@ -146,7 +146,7 @@ class BasePredictor(ABC):
     
     def check_power_on_device_algo(self, folder_path:str, image, image_name:str):
         # Image for drawing
-        img_h, img_w, _ = image.shape
+        img_h, img_w  = image.shape[:2]
         rgb_image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
 
         start_time = time.time()

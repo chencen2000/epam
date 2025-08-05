@@ -1188,8 +1188,12 @@ PERFORMANCE: Total Time: {stats['performance_metrics']['total_inference_time']:.
         
         # Print ground truth comparison summary
         self._print_full_phone_gt_summary(prediction_results)
+
+        response = {
+           "ground_truth_comparison" : prediction_results['ground_truth_comparison'] 
+        }
         
-        return prediction_results
+        return response
 
     def _load_full_phone_ground_truth_data(self, data_path: str) -> Tuple[np.ndarray, np.ndarray, Dict]:
         """Load full phone image with ground truth - reuses existing utilities"""
@@ -1726,7 +1730,10 @@ DATASET INFO:
             },
             'model_info': {
                 'num_classes': self.single_image_predictor.num_classes,
-                'class_names': self.single_image_predictor.class_names
+                'class_names': self.single_image_predictor.class_names,
+                'architecture': self.single_image_predictor.config.get('model_architecture', 'standard'),
+                'confidence_threshold': self.single_image_predictor.confidence_threshold,
+                'device': str(self.single_image_predictor.device),
             },
             'aggregate_metrics': aggregate_metrics,
             'individual_results': [

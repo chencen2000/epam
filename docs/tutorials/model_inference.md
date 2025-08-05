@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `inf.py` script is a comprehensive inference system for multi-class dirt and scratch detection on mobile phone screens. It supports various inference modes including single image prediction, batch processing, and full phone screen analysis with patch-based processing.
+The `inf.py` script is a comprehensive inference system for multi-class (condensationn, dirt, and scratch) detection on mobile phone screens. It supports various inference modes including single image prediction, batch processing, and full phone screen analysis with patch-based processing.
 
 ## Table of Contents
 1. [System Architecture](#system-architecture)
@@ -28,8 +28,9 @@ The inference system consists of several key components:
 
 The system supports 3 classes:
 - **Class 0**: Background (clean areas)
-- **Class 1**: Dirt (particles, dust, fingerprints)
-- **Class 2**: Scratches (physical damage, hairline cracks)
+- **Class 1**: Condensation (moisture trapped) 
+- **Class 2**: Dirt (particles, dust, fingerprints)
+- **Class 3**: Scratches (physical damage, hairline cracks)
 
 ## Configuration
 
@@ -76,6 +77,8 @@ Process a single new image without ground truth.
 
 **Configuration:**
 ```yaml
+default_predictor.yaml
+
 processing:
   batch_mode: false
   new_images: true
@@ -85,11 +88,14 @@ processing:
 
 **Use Case:** Quick analysis of individual phone screen images.
 
+
 ### Mode 2: Batch Processing (New Images)
 Process multiple new images in a directory.
 
 **Configuration:**
 ```yaml
+batch_predictor.yaml
+
 processing:
   batch_mode: true
   new_images: true
@@ -104,6 +110,8 @@ Analyze a complete phone screen using patch-based processing.
 
 **Configuration:**
 ```yaml
+full_phone_single_predictor.yaml
+
 processing:
   batch_mode: false
   new_images: true
@@ -120,6 +128,8 @@ Process multiple full phone images with patch-based analysis.
 
 **Configuration:**
 ```yaml
+full_phone_batch_predictor.yaml 
+
 processing:
   batch_mode: true
   new_images: true
@@ -129,17 +139,47 @@ processing:
 
 **Use Case:** Production-level quality assessment of multiple devices.
 
-### Mode 5: Ground Truth Comparison
-Compare predictions against ground truth masks.
+### Mode 5: Ground Truth Comparison (Single Patch)
+Compare predictions against ground truth masks against a single patch.
 
 **Configuration:**
 ```yaml
+mask_predictor.yaml
+
 processing:
   batch_mode: false
   new_images: false
 ```
 
-**Use Case:** Model validation and performance evaluation.
+**Use Case:** Model validation and performance evaluation on patch.
+
+### Mode 6: Full Phone Ground Truth Comparison 
+Compare full phone images with patch-based predictions against ground truth masks.
+
+**Configuration:**
+
+```yaml
+full_phone_single_predictor_with_gt.yaml
+
+processing:
+  batch_mode: false
+  new_images: false
+  full_phone:
+    enabled: true
+```
+or 
+```yaml
+full_phone_batch_predictor_with_gt.yaml
+
+processing:
+  batch_mode: true
+  new_images: false
+  full_phone:
+    enabled: true
+```
+
+**Use Case:** Model validation and performance evaluation on full phone.
+
 
 ## Command Line Examples
 
@@ -228,11 +268,12 @@ output/
 │   ├── image_name_results.json                 # Detailed results
 │   ├── image_name_class_prediction.png         # Class prediction map
 │   ├── image_name_background_mask.png          # Background mask
-│   ├── image_name_dirt_mask.png               # Dirt mask
-│   ├── image_name_scratches_mask.png          # Scratches mask
+│   ├── image_name_dirt_mask.png                # Dirt mask
+│   ├── image_name_scratches_mask.png           # Scratches mask
 │   ├── image_name_background_probability.png   # Background probabilities
-│   ├── image_name_dirt_probability.png        # Dirt probabilities
-│   └── image_name_scratches_probability.png   # Scratch probabilities
+│   ├── image_name_dirt_probability.png         # Dirt probabilities
+│   └── image_name_scratches_probability.png    # Scratch probabilities
+│   └── image_name_full_phone_gt_comparison.png # Visualization and comaprision against the ground truth (if passed)
 ```
 
 ### Full Phone Output
@@ -246,6 +287,7 @@ output/
 │   ├── image_name_screen_dirt_mask.png
 │   ├── image_name_screen_scratches_mask.png
 │   └── image_name_full_phone_multiclass_overlay.png   # Full image overlay
+│   └── image_name_full_phone_gt_comparison.png # Visualization and comaprision against the ground truth (if passed)
 ```
 
 ### Batch Output
