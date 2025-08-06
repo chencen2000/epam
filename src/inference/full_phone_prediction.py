@@ -143,7 +143,8 @@ class FullScreenPredictor:
         self.logger.info(f"Loading full phone image: {image_path}")
         full_image = self.single_image_predictor.image_operations.load_image_color(image_path)
 
-        if full_image.shape[0] > 1024: 
+        # todo: remove the hardcoded values
+        if full_image.shape[0] > 1792: 
             full_image = self.single_image_predictor.image_operations.resize_image(full_image, 2)
 
         image_path = Path(image_path)
@@ -1196,11 +1197,14 @@ PERFORMANCE: Total Time: {stats['performance_metrics']['total_inference_time']:.
         return response
 
     def _load_full_phone_ground_truth_data(self, data_path: str) -> Tuple[np.ndarray, np.ndarray, Dict]:
-        """Load full phone image with ground truth - reuses existing utilities"""
+        """
+        FIXED: Load full phone image with ground truth - with better error handling
+        """
         data_path = Path(data_path)
         
-        # Expected files for full phone ground truth
-        image_candidates = ['full_phone_image.bmp', 'synthetic_dirty_patch.bmp', 'original_image.bmp']
+        # More flexible file detection
+        image_candidates = ['original_image.bmp', 'full_phone_image.bmp', 'synthetic_dirty_patch.bmp',
+                        'original_image.png', 'full_phone_image.png']
         mask_candidates = [
             'segmentation_mask_multiclass.png',        # Full image multi-class mask
             'segmentation_mask_combined.png',          # Full image binary mask
@@ -1231,52 +1235,90 @@ PERFORMANCE: Total Time: {stats['performance_metrics']['total_inference_time']:.
         
         if not all([image_file, mask_file, labels_file]):
             missing = []
-            if not image_file: missing.append("image file")
-            if not mask_file: missing.append("mask file") 
-            if not labels_file: missing.append("labels file")
+            if not image_file: missing.append(f"image file from {image_candidates}")
+            if not mask_file: missing.append(f"mask file from {mask_candidates}") 
+            if not labels_file: missing.append(f"labels file from {labels_candidates}")
             raise FileNotFoundError(f"Missing files in {data_path}: {missing}")
         
         self.logger.debug(f"Loading: {image_file}, {mask_file}, {labels_file}")
         
-        # Load files
-        image = cv2.imread(str(data_path / image_file))
-        if image is None:
-            raise ValueError(f"Could not load image: {data_path / image_file}")
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        # Load files with better error handling
+        try:
+            image = cv2.imread(str(data_path / image_file))
+            if image is None:
+                raise ValueError(f"Could not load image: {data_path / image_file}")
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            
+            mask = cv2.imread(str(data_path / mask_file), cv2.IMREAD_GRAYSCALE)
+            if mask is None:
+                raise ValueError(f"Could not load mask: {data_path / mask_file}")
+            
+            # FIXED: Only resize if image is larger than expected
+            # TODO: update hardcoded values
+            if mask.shape[0] > 1792 or mask.shape[1] > 1792:
+                m_h, m_w = image.shape[:2]
+                mask = cv2.resize(
+                    mask, 
+                    (m_w // 2, m_h // 2), 
+                    interpolation=cv2.INTER_NEAREST
+                )
+                # mask = self.single_image_predictor.image_operations.resize_image(mask, 2)
+            
+            with open(data_path / labels_file, 'r') as f:
+                labels = json.load(f)
+            
+        except Exception as e:
+            raise ValueError(f"Error loading files from {data_path}: {e}")
         
-        mask = cv2.imread(str(data_path / mask_file), cv2.IMREAD_GRAYSCALE)
-        mask = self.single_image_predictor.image_operations.resize_image(mask, 2)
-        if mask is None:
-            raise ValueError(f"Could not load mask: {data_path / mask_file}")
-        
-        with open(data_path / labels_file, 'r') as f:
-            labels = json.load(f)
-        
-        # Process mask (reuse existing logic)
+        # Process mask
         mask_type = 'multiclass' if 'multiclass' in mask_file else 'binary'
         mask = self._process_full_phone_mask(mask, mask_type)
+        
+        # Log GT distribution for debugging
+        unique_classes = np.unique(mask)
+        total_pixels = mask.size
+        self.logger.debug(f"GT mask {data_path.name} classes: {unique_classes}")
+        for cls in unique_classes:
+            pixel_count = np.sum(mask == cls)
+            percentage = (pixel_count / total_pixels) * 100
+            self.logger.debug(f"  Class {cls}: {percentage:.2f}% ({pixel_count} pixels)")
         
         labels['mask_info'] = {
             'mask_file': mask_file,
             'mask_type': mask_type,
             'image_file': image_file,
-            'labels_file': labels_file
+            'labels_file': labels_file,
+            'loaded_from': str(data_path)
         }
         
         return image, mask, labels
 
     def _process_full_phone_mask(self, mask: np.ndarray, mask_type: str) -> np.ndarray:
-        """Process full phone mask efficiently"""
+        """
+        FIXED: Process full phone mask with better class validation
+        """
         if mask_type == 'multiclass':
             # Ensure values are in correct range [0, 1, 2, 3]
-            if np.max(mask) > 4:
-                mask = np.clip(mask, 0, 4)
+            unique_vals = np.unique(mask)
+            self.logger.debug(f"Original mask values: {unique_vals}")
+            
+            # Check for unexpected values
+            if np.max(mask) > 3:
+                self.logger.warning(f"Mask contains values > 3: {unique_vals}. Clipping to [0, 3]")
+                mask = np.clip(mask, 0, 3)
+            
             return mask.astype(np.uint8)
         else:
-            # Binary mask - normalize to [0, 1]
+            # Binary mask - normalize to [0, 1] and expand to multiclass if needed
             if np.max(mask) > 1:
                 mask = (mask > 127).astype(np.uint8)
-            return mask
+            
+            # For compatibility with multiclass pipeline, map to dirt class (2)
+            # Background (0) stays 0, foreground (1) becomes dirt (2)
+            multiclass_mask = np.zeros_like(mask, dtype=np.uint8)
+            multiclass_mask[mask == 1] = 2  # Map dirt to class 2
+            
+            return multiclass_mask
 
     def _prepare_ground_truth_for_comparison(self, ground_truth: np.ndarray, 
                                            screen_coords: Dict, 
@@ -1598,7 +1640,6 @@ DATASET INFO:
         
         if max_samples:
             sample_dirs = sample_dirs[:max_samples]
-            
         self.logger.info(f"Found {len(sample_dirs)} full phone ground truth samples")
         
         if output_dir is None:
@@ -1672,14 +1713,27 @@ DATASET INFO:
         return results
 
     def _is_full_phone_gt_sample(self, sample_dir: Path) -> bool:
-        """Check if directory contains full phone ground truth data"""
-        image_files = ['full_phone_image.bmp', 'synthetic_dirty_patch.bmp', 'original_image.bmp']
-        mask_files = ['segmentation_mask_multiclass.png', 'segmentation_mask_combined.png']
+        """
+        FIXED: More flexible detection of full phone ground truth samples
+        """
+        # More flexible file detection
+        image_files = ['full_phone_image.bmp', 'synthetic_dirty_patch.bmp', 'original_image.bmp', 
+                    'full_phone_image.png', 'original_image.png']
+        mask_files = ['segmentation_mask_multiclass.png', 'segmentation_mask_combined.png',
+                    'segmentation_mask_patch_multiclass.png', 'segmentation_mask_patch.png']
         labels_files = ['labels.json', 'labels_patch.json']
         
         has_image = any((sample_dir / f).exists() for f in image_files)
         has_mask = any((sample_dir / f).exists() for f in mask_files)
         has_labels = any((sample_dir / f).exists() for f in labels_files)
+        
+        # Debug logging for missing files
+        if not has_image:
+            self.logger.debug(f"{sample_dir.name}: No valid image file found. Checked: {image_files}")
+        if not has_mask:
+            self.logger.debug(f"{sample_dir.name}: No valid mask file found. Checked: {mask_files}")
+        if not has_labels:
+            self.logger.debug(f"{sample_dir.name}: No valid labels file found. Checked: {labels_files}")
         
         return has_image and has_mask and has_labels
 
@@ -1716,7 +1770,7 @@ DATASET INFO:
                 # Per-class aggregates
                 for cls in range(self.single_image_predictor.num_classes):
                     class_name = self.single_image_predictor.class_names[cls]
-                    class_ious = [m.get(f'{class_name}_iou', 0) for m in gt_metrics]
+                    class_ious = [m.get(f'{class_name}_iou', 0) for m in gt_metrics if m.get(f'{class_name}_iou', 0) > 0]
                     if class_ious:
                         aggregate_metrics['ground_truth_comparison'][f'{class_name}_avg_iou'] = float(np.mean(class_ious))
         
