@@ -1038,12 +1038,20 @@ CLASS STATISTICS:"""
                 'error': 'Missing required files'
             }
 
-    def _calculate_essential_metrics(self, prediction: np.ndarray, ground_truth: np.ndarray) -> Dict:
-        """Calculate only essential metrics efficiently"""
+    def _calculate_essential_metrics(self, prediction: np.ndarray, ground_truth: np.ndarray, 
+                                dilation_radius: int = 4) -> Dict:
+        """Calculate only essential metrics efficiently with optional mask dilation"""
         try:
-            # Flatten for efficiency
-            pred_flat = prediction.flatten()
-            gt_flat = ground_truth.flatten()
+            # Create kernel for dilation if radius > 0
+            kernel = None
+            if dilation_radius > 0:
+                import cv2
+                kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, 
+                                                (2*dilation_radius+1, 2*dilation_radius+1))
+            
+            # Create independent binary masks for all classes and apply dilation
+            pred_masks = self._create_and_dilate_class_masks(prediction, kernel)  # Shape: (num_classes, H, W)
+            gt_masks = self._create_and_dilate_class_masks(ground_truth, kernel)   # Shape: (num_classes, H, W)
             
             # Calculate per-class IoU and Dice efficiently
             metrics = {}
@@ -1051,18 +1059,37 @@ CLASS STATISTICS:"""
             dices = []
             
             for cls in range(self.num_classes):
-                pred_cls = (pred_flat == cls)
-                true_cls = (gt_flat == cls)
+                pred_cls = pred_masks[cls].flatten().astype(bool)
+                true_cls = gt_masks[cls].flatten().astype(bool)
                 
                 intersection = np.sum(pred_cls & true_cls)
                 union = np.sum(pred_cls | true_cls)
                 pred_sum = np.sum(pred_cls)
                 true_sum = np.sum(true_cls)
+
+                # Handle different cases:
+                if true_sum == 0 and pred_sum == 0:
+                    # Class is absent in both GT and prediction
+                    # This is a correct "non-detection" - can skip or count as perfect (IoU=1, Dice=1)
+                    # Skipping is more common practice to avoid inflating scores
+                    continue
+                elif true_sum == 0 and pred_sum > 0:
+                    # Class is absent in GT but present in prediction (False Positives only)
+                    # This represents over-segmentation - should penalize with IoU=0, Dice=0
+                    iou = 0.0
+                    dice = 0.0
+                elif true_sum > 0 and pred_sum == 0:
+                    # Class is present in GT but absent in prediction (False Negatives only) 
+                    # This represents model failure to detect - should penalize with IoU=0, Dice=0
+                    iou = 0.0
+                    dice = 0.0
+                else:
+                    # Normal case: both GT and prediction have the class
+                    # IoU
+                    iou = intersection / union if union > 0 else 1.0
+                    # Dice  
+                    dice = (2 * intersection) / (pred_sum + true_sum) if (pred_sum + true_sum) > 0 else 1.0
                 
-                # IoU
-                iou = intersection / union if union > 0 else 1.0
-                # Dice  
-                dice = (2 * intersection) / (pred_sum + true_sum) if (pred_sum + true_sum) > 0 else 1.0
                 
                 class_name = self.class_names[cls]
                 metrics[f'{class_name}_iou'] = float(iou)
@@ -1071,9 +1098,9 @@ CLASS STATISTICS:"""
                 ious.append(iou)
                 dices.append(dice)
             
-            # Mean metrics
-            metrics['mean_iou'] = float(np.mean(ious))
-            metrics['mean_dice'] = float(np.mean(dices))
+            # Mean metrics (only from non-skipped classes)
+            metrics['mean_iou'] = float(np.mean(ious)) if ious else 0.0
+            metrics['mean_dice'] = float(np.mean(dices)) if dices else 0.0
             
             return metrics
             
@@ -1081,6 +1108,39 @@ CLASS STATISTICS:"""
             self.logger.error(f"Failed to calculate essential metrics: {e}")
             return {'error': str(e)}
 
+    def _create_and_dilate_class_masks(self, mask: np.ndarray, kernel: np.ndarray = None) -> np.ndarray:
+        """Create independent binary masks for all classes and apply dilation
+        
+        Args:
+            mask: Input multiclass mask (H, W) with class indices
+            kernel: Dilation kernel, if None no dilation is applied
+            
+        Returns:
+            Binary masks tensor of shape (num_classes, H, W) where each channel is dilated independently
+        """
+        import cv2
+        h, w = mask.shape
+        
+        # Create binary masks for each class (H, W, num_classes)
+        binary_masks = np.zeros((h, w, self.num_classes), dtype=np.uint8)
+        
+        # Create masks for all non-background classes first
+        for cls in range(1, self.num_classes):  # Skip background (class 0)
+            binary_masks[:, :, cls] = (mask == cls).astype(np.uint8)
+        
+        # Create background mask as "all image" - "union of all other masks"
+        union_of_non_bg = np.any(binary_masks[:, :, 1:], axis=2)  # Union of classes 1,2,3...
+        binary_masks[:, :, 0] = (~union_of_non_bg).astype(np.uint8)  # Background = NOT(union)
+        
+        # Apply dilation to all class masks independently if kernel provided
+        if kernel is not None:
+            for cls in range(self.num_classes):
+                binary_masks[:, :, cls] = cv2.dilate(binary_masks[:, :, cls], kernel, iterations=1)
+        
+        # Transpose to (num_classes, H, W) for easier processing
+        return binary_masks.transpose(2, 0, 1)
+    
+        
     def _calculate_essential_binary_metrics(self, prediction: np.ndarray, ground_truth: np.ndarray) -> Dict:
         """Calculate essential binary metrics efficiently"""
         try:
