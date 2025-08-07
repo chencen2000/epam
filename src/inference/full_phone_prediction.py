@@ -168,7 +168,7 @@ class FullScreenPredictor:
         
         # Run inference on all patches
         self.logger.info("Running multi-class inference on patches...")
-        patch_results = self.prediction_full_screen_patch(patches_data)
+        patch_results = self.prediction_full_screen_patch(patches_data, (patch_size, patch_size))
         
         # Aggregate results back to full screen coordinates
         self.logger.info("Aggregating multi-class patch results...")
@@ -433,7 +433,7 @@ class FullScreenPredictor:
         else:
             raise ValueError(f"Unexpected image shape: {image.shape}")
     
-    def prediction_full_screen_patch(self, patches_data: List[Tuple]) -> List[Dict]:
+    def prediction_full_screen_patch(self, patches_data: List[Tuple], target_size:Tuple[int, int] = (1792, 1792)) -> List[Dict]:
         """Run multi-class inference on all patches - FIXED FOR GRAYSCALE"""
         patch_results = []
         
@@ -443,7 +443,7 @@ class FullScreenPredictor:
                 gray_patch = self._convert_to_grayscale(patch_img)
                 
                 # Run prediction on grayscale patch
-                patch_result = self.single_image_predictor.predict(gray_patch, return_raw=False)
+                patch_result = self.single_image_predictor.predict(gray_patch, target_size, return_raw=False)
                 
                 # Add patch metadata
                 patch_result.update({

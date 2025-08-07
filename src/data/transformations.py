@@ -22,7 +22,7 @@ def get_val_transforms(target_size: Tuple[int, int] = (512, 512)) -> A.Compose:
 def get_transforms(target_size: Tuple[int, int] = None, config:Dict=None) -> A.Compose:
         """Get preprocessing transforms"""
         if target_size is None:
-            target_size = config.get('target_size', (1024, 1024))
+            target_size = config.get('target_size', (1792, 1792))
             
         return A.Compose([
             A.Resize(target_size[0], target_size[1]),

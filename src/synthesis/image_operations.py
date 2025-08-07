@@ -196,7 +196,7 @@ class ImageOperations:
         
         return distorted_mask
 
-    def preprocess_prediction_image(self,  image: np.ndarray, device:str="auto", target_size: Tuple[int, int] = (1024, 1024), config={}) -> Tensor:
+    def preprocess_prediction_image(self,  image: np.ndarray, device:str="auto", target_size: Tuple[int, int] = (1792, 1792), config={}) -> Tensor:
         """Preprocess single image for inference"""
         # if target_size is None:
         #     target_size = self.config.get('target_size', (1024, 1024))
@@ -211,7 +211,7 @@ class ImageOperations:
     
 
     def preprocess_prediction_image(self, image: np.ndarray, device: str, 
-                               target_size: Tuple[int, int] = (1024, 1024),
+                               target_size: Tuple[int, int] = (1792, 1792),
                                config: Dict = None) -> torch.Tensor:
         """
         Preprocess image for prediction - FIXED FOR GRAYSCALE MODEL

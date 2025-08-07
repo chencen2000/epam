@@ -315,7 +315,7 @@ class ImageProcessor:
     # Preprocess
 
     def preprocess_prediction_image(self, image: np.ndarray, device: str, 
-                               target_size: Tuple[int, int] = (1024, 1024),
+                               target_size: Tuple[int, int] = (1792, 1792),
                                config: Dict = None) -> torch.Tensor:
         """
         Preprocess image for prediction - FIXED FOR GRAYSCALE MODEL
