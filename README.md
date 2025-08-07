@@ -2,23 +2,24 @@
 ![image](https://github.com/user-attachments/assets/c564dc1b-ef6e-49ef-9771-c8db051600ac)
 
 ## Task and approach
-Business task is to detect and localize different types of dirt on the front and rear surfaces of the mobile devices.
-We will utilize high-resolution images available from the grading machine.
-We selected semantic segmentation approach with simplified post-processing of network outputs to detect instances of dirt and their classes.
+Business task is to detect and localize different types of dirt and defects on frontal and rear surfaces of the mobile devices.
+For that purpose, we can utilize high-resolution images (7296x16000 pixels) available from the grading machine.
+Due to very limited compute resources (3s processing time on Intel i7-6700 CPU), we downscale these images to 1/2 of the original resolution for processing. 
+We selected semantic segmentation approach with simplified post-processing of network outputs to detect dirt and defects.
 Synthetically generated dataset with automatic pixel annotations is utilized to pre-train the semantic segmentation model.
 
-Currently, dataset has only two class labels: `dirt` pixels and `clean` (background) pixels, as we utilize only clean samples without noticeable permanent defects as a background for dataset generation. We utilize a unclassified subset of dirt samples from the original dataset, provided by FutureDial team.
+Currently, dataset has four class labels: `condensation`, `dirt`, `scratches` and `clean` (background) pixels.
+For model training one can utilize either clean samples without any noticeable defects or scratched samples with only scratches on them as a reference background images for dataset generation.
+On clean samples patches of all three types, condensation, dirt and scratch are being superimposed over reference background.
+Once we get the pre-trained model, capable of differentiating everything from background, we can run it (inference) on clean scratchy samples containing only scratches and use model predictions on them as automatic annotations for scratches.
+Then, on these scratched samples only condensation and dirt patches are being superimposed, and model can be re-trained (fine-tuned) on this dataset, containing real samples with real scratches.
+Patches used for sumerimposing were collected from training batches Batch1 and Batch2.
 Please, refer to the [**Dataset generation**](https://github.com/chencen2000/epam/edit/main/README.md#dataset-generation) section for further information about current dataset generation approach.
 
-### TODO: next steps
-Once we get the pre-trained model, capable of differentiating all the dirt from background, we plan to apply it to clean samples containing various scratches.
-We  expect that the model will have false positive detections on them. Thus, we will obtain hard negative samples for further model fine-tuning and automatic labels for the third distinctive class, `scratches`.
-We are currently in the process of annotating additional dirt samples and some permanent defects together with their class labels. We do not plan to provide separate manual annotations for scratches - we expect to get enough scratch samples from original dataset, model false positives and xml files.
-
 ## Dataset generation
-- We downsample original clean images x2 by width and height to generate synthetic dirt images. We use additional scaling, rotation and translation of randomly selected dirt samples as an augmantation technique to superimpose dirt om clean images.
+- We downsample original clean images x2 by width and height to generate synthetic images. We use additional scaling, rotation and translation of randomly selected dirt samples as an augmantation technique to superimpose dirt on clean images.
 - Each generated sample contains multiple dirt instances superimposed over clean background.
-- Generated sample and corresponding binary mask is then split into non-overlapping patches of `1024x1024` resolution (TODO: add patch overlapping to increase the amount of data). Those patches are then utilized for semantic segmentation model pre-training.
+- Generated sample and corresponding masks is then split into non-overlapping patches of `1792x1792` resolution. Those patches are then utilized for semantic segmentation model pre-training.
 
 ### Python modules description
 The [**src**](https://github.com/chencen2000/epam/tree/develop) folder contains the core Python scripts for a synthetic dirt image data generation pipeline. This includes modules for:
@@ -35,7 +36,7 @@ The [**src**](https://github.com/chencen2000/epam/tree/develop) folder contains 
 ## Model architecture and pre-training process
 Our slim model inherits the ideas from original [U-net](https://arxiv.org/abs/1505.04597) as proposed by Ronneberger et al. However, it has fewer stages and lower number of channels to meet speed requirements. It utilizes dilated convolitions (x2) at every stage to increase the receptive field of the model. Overall, the model has only a fraction of number of trainable parameters, compared to the original U-net model.
 
-![UNet-architecture-This-diagram-is-based-on-the-original-UNet-publication-20 (1)](https://github.com/user-attachments/assets/d38f1a8c-9f54-4bf4-b292-041244796a40)
+![UNet-architecture-This-diagram-is-based-on-the-original-UNet-publication-20 (1)](https://github.com/user-attachments/assets/3d8394fc-00ff-4c15-a83b-a6d9fb6a6e9e)
 
-Slim model architecture diagram. The architecture diagram is preliminary and approximate, serves as an illustration of the approach, the exact number of channels on some of the layers can be different in the training [code](https://github.com/chencen2000/epam/blob/main/src/training.py).
+Slim model architecture diagram. The architecture diagram is approximate, serves as an illustration of the approach, the exact number of channels on some of the layers can be different in the training [code](https://github.com/chencen2000/epam/blob/main/src/training.py).
 
