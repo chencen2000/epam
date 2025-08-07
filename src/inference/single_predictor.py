@@ -35,7 +35,7 @@ class SingleImagePredictor(BasePredictor):
         self.logger = app_logger.getChild('SingleImagePredictor')
 
 
-    def predict(self, image: np.ndarray, target_size=(1024, 1024), return_raw: bool = False) -> Dict:
+    def predict(self, image: np.ndarray, target_size=(1792, 1792), return_raw: bool = False) -> Dict:
         """Predict on a single image - FIXED FOR GRAYSCALE MODEL."""
         original_size = image.shape[:2]
         
@@ -61,7 +61,7 @@ class SingleImagePredictor(BasePredictor):
             logits = self.model(image_tensor)
             inference_time = time.time() - start_time
 
-            # self.logger.info(f"Model inference time = {inference_time}")
+            self.logger.debug(f"Model inference time = {inference_time}")
             
             # FIXED: Use softmax for multi-class instead of sigmoid
             probabilities = softmax(logits, dim=1).cpu().numpy()[0]  # Shape: (num_classes, H, W)
@@ -1039,7 +1039,7 @@ CLASS STATISTICS:"""
             }
 
     def _calculate_essential_metrics(self, prediction: np.ndarray, ground_truth: np.ndarray, 
-                                dilation_radius: int = 4) -> Dict:
+                                dilation_radius: int = 3) -> Dict:
         """Calculate only essential metrics efficiently with optional mask dilation"""
         try:
             # Create kernel for dilation if radius > 0
