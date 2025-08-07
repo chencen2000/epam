@@ -686,16 +686,21 @@ class FullScreenPredictor:
         
         # Apply multi-class overlay to screen region
         screen_region = full_overlay[screen_y:screen_y+screen_h, screen_x:screen_x+screen_w]
-        
+
         # Dirt overlay (green)
-        dirt_mask = class_prediction == 1
-        if np.any(dirt_mask):
-            screen_region[dirt_mask] = screen_region[dirt_mask] * 0.3 + np.array([0, 255, 0]) * 0.7
+        condensation_mask = class_prediction == 1
+        if np.any(condensation_mask):
+            screen_region[condensation_mask] = screen_region[condensation_mask] * 0.3 + np.array([0, 255, 0]) * 0.7
         
-        # Scratches overlay (red)
-        scratch_mask = class_prediction == 2
+        # Dirt overlay (red)
+        dirt_mask = class_prediction == 2
+        if np.any(dirt_mask):
+            screen_region[dirt_mask] = screen_region[dirt_mask] * 0.3 + np.array([255, 0, 0]) * 0.7
+        
+        # Scratches overlay (blue)
+        scratch_mask = class_prediction == 3
         if np.any(scratch_mask):
-            screen_region[scratch_mask] = screen_region[scratch_mask] * 0.3 + np.array([255, 0, 0]) * 0.7
+            screen_region[scratch_mask] = screen_region[scratch_mask] * 0.3 + np.array([0, 0, 255]) * 0.7
         
         full_overlay[screen_y:screen_y+screen_h, screen_x:screen_x+screen_w] = screen_region
         
